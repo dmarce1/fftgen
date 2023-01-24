@@ -9,7 +9,7 @@
 #include <vector>
 #include <fftw3.h>
 
-#define MAXFFT 166
+#define MAXFFT 128
 #define DFFT 1
 
 FILE* fp = nullptr;
@@ -255,16 +255,9 @@ void fft_radix(int r, int N, int o);
 std::vector<int> fft_radix_bitr(int r, int N, int o, std::vector<int> indices);
 std::vector<int> fft_bitreverse_indices(int N);
 
-int fft_radix2_opcnt(int N, int o = 0);
-int fft_radix3_opcnt(int N, int o = 0);
-int fft_radix4_opcnt(int N, int o = 0);
-int fft_radix5_opcnt(int N, int o = 0);
-int fft_radix6_opcnt(int N, int o = 0);
-int fft_radix_opcnt(int r, int N, int o = 0);
+int fft_radix_opcnt(int r, int N);
 void fft(int N, int o);
-int fft_opcnt(int N, int o = 0);
-void cooley_tukey_fft(int N, int o);
-int cooley_tukey_fft_opcnt(int N, int o);
+int fft_opcnt(int N);
 
 int bluestein_fft_opcnt(int N) {
 	int cnt = 0;
@@ -273,14 +266,14 @@ int bluestein_fft_opcnt(int N) {
 		return 999999999;
 	}
 	cnt += 21 * N;
-	cnt += 2 * fft_opcnt(M, 0);
+	cnt += 2 * fft_opcnt(M);
 	return cnt;
 }
 
 void fft_bitreverse(int N, std::vector<int> indices = std::vector<int>(), int o = 0);
 
-void bluestein_fft(int N, int o) {
-	printf("Bluestein %i\n", N);
+/*void bluestein_fft(int N, int o) {
+//	printf("Bluestein %i\n", N);
 	const int M = bluestein_size(N);
 	const std::vector<std::complex<double>> fourb = four_blustein_series(N);
 	const std::vector<std::complex<double>> b = blustein_series(N);
@@ -316,7 +309,7 @@ void bluestein_fft(int N, int o) {
 	}
 	deindent();
 	print("}\n");
-}
+}*/
 
 void raders_fft(int r, int N, int o) {
 	const int N1 = r;
@@ -324,7 +317,7 @@ void raders_fft(int r, int N, int o) {
 	print("{\n");
 	indent();
 	print("// Raders radix - %i x %i\n", N1, N2);
-	printf("// Raders radix - %i \n", r);
+//	printf("// Raders radix - %i \n", r);
 	print("std::array<std::complex<double>, %i> y;\n", N);
 	print("std::array<std::complex<double>, %i> xo, xk0;\n", N2);
 	print("std::complex<double> tmp;\n");
@@ -457,13 +450,13 @@ void raders_fft(int r, int N, int o) {
 	print("}\n");
 }
 
-int raders_fft_opcnt(int r, int N, int o) {
+int raders_fft_opcnt(int r, int N) {
 	int cnt = 0;
 	const int N1 = r;
 	const int N2 = N / r;
 	if (N2 > 1) {
 		cnt += N;
-		cnt += N1 * fft_opcnt(N2, 0);
+		cnt += N1 * fft_opcnt(N2);
 		cnt += N;
 	}
 	cnt += 6 * (N - 1);
@@ -476,7 +469,7 @@ int raders_fft_opcnt(int r, int N, int o) {
 	return cnt;
 }
 
-int print_z_opcnt(int zi, int k, int r, int N, int o) {
+int print_z_opcnt(int zi, int k, int r, int N) {
 	if (zi * k == 0) {
 		return 0;
 	} else if (zi * k == N / 8 && N % 8 == 0) {
@@ -522,8 +515,6 @@ void print_z(int zi, int k, int r, int N, int o) {
 	}
 }
 
-int cooley_tukey_fft_opcnt(int N1, int N2, int o);
-
 int best_radix(int N, int o) {
 	int best_cnt = 999999999;
 	int best_radix = -1;
@@ -531,13 +522,13 @@ int best_radix(int N, int o) {
 		if (N % r == 0) {
 			int this_cnt;
 			if (r <= 6 || is_prime(r)) {
-				this_cnt = fft_radix_opcnt(r, N, o);
+				this_cnt = fft_radix_opcnt(r, N);
 				if (this_cnt < best_cnt) {
 					best_cnt = this_cnt;
 					best_radix = r;
 				}
 				if (r > 6) {
-					int raders_cnt = raders_fft_opcnt(r, N, o);
+					int raders_cnt = raders_fft_opcnt(r, N);
 					if (raders_cnt < best_cnt) {
 						best_cnt = raders_cnt;
 						best_radix = r;
@@ -546,121 +537,30 @@ int best_radix(int N, int o) {
 			}
 		}
 	}
-	if (greatest_prime_factor(N) > bluestein_gpf) {
+/*	if (greatest_prime_factor(N) > bluestein_gpf) {
 		int bluestein_cnt = bluestein_fft_opcnt(N);
 		if (bluestein_cnt < best_cnt) {
 			return -1;
 		}
-	}
+	}*/
 	return best_radix;
 }
 
-void cooley_tukey_fft(int N, int o) {
-	/*	const int N1 = square_factor(N);
-	 const int N2 = N / N1;
-	 print("// Cooley-Tukey %i = %i x %i\n", N, N1, N2);
-	 print("std::swap(x, x0);\n");
-	 for (int n1 = 0; n1 < N1; n1++) {
-	 fft(N2, o + n1 * s, N1 * s);
-	 }
-	 print("std::swap(x, x0);\n");
-	 for (int k2 = 0; k2 < N2; k2++) {
-	 const int osk2N1 = o + s * k2 * N1;
-	 for (int n1 = 0; n1 < N1; n1++) {
-	 const int nk = (n1 * k2) % N;
-	 if (nk == 0) {
-	 } else if (nk == N / 8 && N % 8 == 0) {
-	 print("x0[%i] = No8x(x0[%i]);\n", osk2N1 + s * n1, osk2N1 + s * n1);
-	 } else if (nk == 3 * N / 8 && N % 8 == 0) {
-	 print("x0[%i] = nNo8xIx(x0[%i]);\n", osk2N1 + s * n1, osk2N1 + s * n1);
-	 } else if (nk == 5 * N / 8 && N % 8 == 0) {
-	 print("x0[%i] = nNo8x(x0[%i]);\n", osk2N1 + s * n1, osk2N1 + s * n1);
-	 } else if (nk == 7 * N / 8 && N % 8 == 0) {
-	 print("x0[%i] = No8xIx(x0[%i]);\n", osk2N1 + s * n1, osk2N1 + s * n1);
-	 } else if (nk == N / 4 && N % 4 == 0) {
-	 print("x0[%i] = nIx(x0[%i]);\n", osk2N1 + s * n1, osk2N1 + s * n1);
-	 } else if (nk == N / 2 && N % 2 == 0) {
-	 print("x0[%i] = -x0[%i];\n", osk2N1 + s * n1, osk2N1 + s * n1);
-	 } else if (nk == 3 * N / 4 && N % 4 == 0) {
-	 print("x0[%i] = Ix(x0[%i]);\n", osk2N1 + s * n1, osk2N1 + s * n1);
-	 } else {
-	 print("x0[%i] *= %s;\n", osk2N1 + s * n1, to_str(twiddle(nk, N)).c_str());
-	 }
-	 print("x[%i] = x0[%i];\n", osk2N1 + s * n1, osk2N1 + s * n1);
-	 }
-	 }
-	 for (int k2 = 0; k2 < N2; k2++) {
-	 fft(N1, o + N1 * k2 * s, s);
-	 }
-	 print("std::swap(x, x0);\n");
-	 for (int k1 = 0; k1 < N1; k1++) {
-	 for (int k2 = 0; k2 < N2; k2++) {
-	 print("x[%i] = x0[%i];\n", o + s * (N1 * k2 + k1), o + s * (N1 * k2 + k1));
-	 }
-	 }
-	 print("std::swap(x, x0);\n");
-	 for (int k2 = 0; k2 < N2; k2++) {
-	 for (int k1 = 0; k1 < N1; k1++) {
-	 print("x[%i] = x0[%i];\n", o + s * (N2 * k1 + k2), o + s * (N1 * k2 + k1));
-	 }
-	 }*/
-}
 std::vector<int> fft_bitr(int N, int o, std::vector<int> indices);
 
-int cooley_tukey_fft_opcnt(int N, int o) {
-	const int N1 = square_factor(N);
-	const int N2 = N / N1;
-	if (N1 == N || N2 == N) {
-		return 999999999;
-	}
-	int cnt = 0;
-	for (int n1 = 0; n1 < N1; n1++) {
-		cnt += fft_opcnt(N2, o + n1);
-	}
-	for (int k2 = 0; k2 < N2; k2++) {
-		const int osk2N1 = o + k2 * N1;
-		for (int n1 = 0; n1 < N1; n1++) {
-			const int nk = (n1 * k2) % N;
-			if (nk == 0) {
-			} else if (nk == N / 8 && N % 8 == 0) {
-				cnt += 4;
-			} else if (nk == 3 * N / 8 && N % 8 == 0) {
-				cnt += 4;
-			} else if (nk == 5 * N / 8 && N % 8 == 0) {
-				cnt += 4;
-			} else if (nk == 7 * N / 8 && N % 8 == 0) {
-				cnt += 4;
-			} else if (nk == N / 4 && N % 4 == 0) {
-				cnt += 1;
-			} else if (nk == N / 2 && N % 2 == 0) {
-				cnt += 2;
-			} else if (nk == 3 * N / 4 && N % 4 == 0) {
-				cnt += 1;
-			} else {
-				cnt += 6;
-			}
-		}
-	}
-	for (int k2 = 0; k2 < N2; k2++) {
-		cnt += fft_opcnt(N1, o + N1 * k2);
-	}
-	cnt += 2 * N1 * N2;
-	return cnt;
-}
-
-int fft_opcnt(int N, int o) {
+int fft_opcnt(int N) {
 	int best_cnt = 999999999;
 	int best_radix = -1;
 	for (int r = 2; r <= N; r++) {
 		if (N % r == 0) {
 			if (r <= 6 || is_prime(r)) {
-				const int this_cnt = fft_radix_opcnt(r, N, o);
+				const int this_cnt = fft_radix_opcnt(r, N);
 				if (this_cnt < best_cnt) {
 					best_cnt = this_cnt;
 					best_radix = r;
 				}
 				if (r > 6) {
-					int raders_cnt = raders_fft_opcnt(r, N, o);
+					int raders_cnt = raders_fft_opcnt(r, N);
 					if (raders_cnt < best_cnt) {
 						best_cnt = raders_cnt;
 						best_radix = r;
@@ -672,133 +572,114 @@ int fft_opcnt(int N, int o) {
 	return best_cnt;
 }
 
-int fft_radix2_opcnt(int N, int o) {
-	if (N < 2) {
-		return 0;
-	}
+int fft_radix_opcnt(int r, int N) {
 	int cnt = 0;
-	if (N > 2) {
-		cnt += fft_opcnt(N / 2, o);
-		cnt += fft_opcnt(N / 2, o);
-	}
-	for (int k = 0; k < N / 2; k++) {
-		for (int i = 0; i < 2; i++) {
-			cnt += print_z_opcnt(i, k, 2, N, o);
-		}
-		cnt += 4;
-	}
-	return cnt;
-}
-
-int fft_radix3_opcnt(int N, int o) {
-	if (N < 3) {
-		return 0;
-	}
-	int cnt = 0;
-	if (N > 3) {
-		cnt += fft_opcnt(N / 3, o);
-		cnt += fft_opcnt(N / 3, o);
-		cnt += fft_opcnt(N / 3, o);
-	}
-	for (int k = 0; k < N / 3; k++) {
-		for (int i = 0; i < 3; i++) {
-			cnt += print_z_opcnt(i, k, 3, N, o);
-		}
-		cnt += 20;
-	}
-	return cnt;
-}
-
-int fft_radix4_opcnt(int N, int o) {
-	if (N < 4) {
-		return 0;
-	}
-	int cnt = 0;
-	if (N > 4) {
-		cnt += fft_opcnt(N / 4, o);
-		cnt += fft_opcnt(N / 4, o);
-		cnt += fft_opcnt(N / 4, o);
-		cnt += fft_opcnt(N / 4, o);
-	}
-	for (int k = 0; k < N / 4; k++) {
-		for (int i = 0; i < 4; i++) {
-			cnt += print_z_opcnt(i, k, 4, N, o);
-		}
-		cnt += 18;
-	}
-	return cnt;
-}
-
-int fft_radix5_opcnt(int N, int o) {
-	if (N < 5) {
-		return 0;
-	}
-	int cnt = 0;
-	if (N > 5) {
-		cnt += fft_opcnt(N / 5, o);
-		cnt += fft_opcnt(N / 5, o);
-		cnt += fft_opcnt(N / 5, o);
-		cnt += fft_opcnt(N / 5, o);
-		cnt += fft_opcnt(N / 5, o);
-	}
-	for (int k = 0; k < N / 5; k++) {
-		for (int i = 0; i < 5; i++) {
-			cnt += print_z_opcnt(i, k, 5, N, o);
-		}
-		cnt += 48;
-	}
-	return cnt;
-}
-
-int fft_radix6_opcnt(int N, int o) {
-	if (N < 6) {
-		return 0;
-	}
-	int cnt = 0;
-	if (N > 6) {
-		cnt += fft_opcnt(N / 6, o);
-		cnt += fft_opcnt(N / 6, o);
-		cnt += fft_opcnt(N / 6, o);
-		cnt += fft_opcnt(N / 6, o);
-		cnt += fft_opcnt(N / 6, o);
-		cnt += fft_opcnt(N / 6, o);
-	}
-	for (int k = 0; k < N / 6; k++) {
-		for (int i = 0; i < 6; i++) {
-			cnt += print_z_opcnt(i, k, 6, N, o);
-		}
-		cnt += 48;
-	}
-	return cnt;
-}
-
-int fft_radix_opcnt(int r, int N, int o) {
 	switch (r) {
 	case 1:
 		return 0;
 	case 2:
-		return fft_radix2_opcnt(N, o);
+		if (N < 2) {
+			return 0;
+		}
+		cnt = 0;
+		if (N > 2) {
+			cnt += fft_opcnt(N / 2);
+			cnt += fft_opcnt(N / 2);
+		}
+		for (int k = 0; k < N / 2; k++) {
+			for (int i = 0; i < 2; i++) {
+				cnt += print_z_opcnt(i, k, 2, N);
+			}
+			cnt += 4;
+		}
+		return cnt;
 	case 3:
-		return fft_radix3_opcnt(N, o);
+		if (N < 3) {
+			return 0;
+		}
+		cnt = 0;
+		if (N > 3) {
+			cnt += fft_opcnt(N / 3);
+			cnt += fft_opcnt(N / 3);
+			cnt += fft_opcnt(N / 3);
+		}
+		for (int k = 0; k < N / 3; k++) {
+			for (int i = 0; i < 3; i++) {
+				cnt += print_z_opcnt(i, k, 3, N);
+			}
+			cnt += 20;
+		}
+		return cnt;
 	case 4:
-		return fft_radix4_opcnt(N, o);
+		if (N < 4) {
+			return 0;
+		}
+		cnt = 0;
+		if (N > 4) {
+			cnt += fft_opcnt(N / 4);
+			cnt += fft_opcnt(N / 4);
+			cnt += fft_opcnt(N / 4);
+			cnt += fft_opcnt(N / 4);
+		}
+		for (int k = 0; k < N / 4; k++) {
+			for (int i = 0; i < 4; i++) {
+				cnt += print_z_opcnt(i, k, 4, N);
+			}
+			cnt += 18;
+		}
+		return cnt;
 	case 5:
-		return fft_radix5_opcnt(N, o);
+		if (N < 5) {
+			return 0;
+		}
+		cnt = 0;
+		if (N > 5) {
+			cnt += fft_opcnt(N / 5);
+			cnt += fft_opcnt(N / 5);
+			cnt += fft_opcnt(N / 5);
+			cnt += fft_opcnt(N / 5);
+			cnt += fft_opcnt(N / 5);
+		}
+		for (int k = 0; k < N / 5; k++) {
+			for (int i = 0; i < 5; i++) {
+				cnt += print_z_opcnt(i, k, 5, N);
+			}
+			cnt += 48;
+		}
+		return cnt;
 	case 6:
-		return fft_radix6_opcnt(N, o);
+		if (N < 6) {
+			return 0;
+		}
+		cnt = 0;
+		if (N > 6) {
+			cnt += fft_opcnt(N / 6);
+			cnt += fft_opcnt(N / 6);
+			cnt += fft_opcnt(N / 6);
+			cnt += fft_opcnt(N / 6);
+			cnt += fft_opcnt(N / 6);
+			cnt += fft_opcnt(N / 6);
+		}
+		for (int k = 0; k < N / 6; k++) {
+			for (int i = 0; i < 6; i++) {
+				cnt += print_z_opcnt(i, k, 6, N);
+			}
+			cnt += 48;
+		}
+		return cnt;
 	default:
 		if (N < r) {
 			return 0;
 		}
-		int cnt = 0;
+		cnt = 0;
 		if (N > r) {
 			for (int j = 0; j < r; j++) {
-				cnt += fft_opcnt(N / r, o + j);
+				cnt += fft_opcnt(N / r);
 			}
 		}
 		for (int k = 0; k < N / r; k++) {
 			for (int i = 0; i < r; i++) {
-				cnt += print_z_opcnt(i, k, r, N, o);
+				cnt += print_z_opcnt(i, k, r, N);
 			}
 
 			for (int j = 1; j <= (r - 1) / 2; j++) {
@@ -870,11 +751,11 @@ void fft(int N, int o) {
 		return;
 	}
 	int radix = best_radix(N, o);
-	if (radix > 0) {
+//	if (radix > 0) {
 		fft_radix(radix, N, o);
-	} else {
-		bluestein_fft(N, o);
-	}
+//	} else if (radix == -1) {
+//		bluestein_fft(N, o);
+//	}
 }
 
 std::vector<int> fft_bitr(int N, int o, std::vector<int> indices) {
@@ -1051,8 +932,8 @@ void fft_radix(int r, int N, int o) {
 		print("}\n");
 		break;
 	default:
-		int raders_cnt = raders_fft_opcnt(r, N, o);
-		int this_cnt = fft_radix_opcnt(r, N, o);
+		int raders_cnt = raders_fft_opcnt(r, N);
+		int this_cnt = fft_radix_opcnt(r, N);
 		if (raders_cnt < this_cnt) {
 			raders_fft(r, N, o);
 			return;
@@ -1213,8 +1094,8 @@ std::vector<int> fft_radix_bitr(int r, int N, int o, std::vector<int> I) {
 		}
 		break;
 	default:
-		int raders_cnt = raders_fft_opcnt(r, N, o);
-		int this_cnt = fft_radix_opcnt(r, N, o);
+		int raders_cnt = raders_fft_opcnt(r, N);
+		int this_cnt = fft_radix_opcnt(r, N);
 		if (raders_cnt < this_cnt) {
 			return I;
 		} else {
@@ -1437,8 +1318,8 @@ int main(int argc, char **argv) {
 	indent();
 
 	fprintf(fp, "\t\ttimer tm1, tm2;\n"
-			"\t\t\tdouble err;\n"
-			"\t\t\tdouble max;\n"
+			"\t\tdouble err;\n"
+			"\t\tdouble max;\n"
 			"\t\tfor (int ti = 0; ti < 256; ti++) {\n"
 			"\t\t\terr = 0.0;\n"
 			"\t\t\tmax = 0.0;\n"
