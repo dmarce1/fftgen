@@ -356,9 +356,9 @@ void raders_fft(int r, int N, int o) {
 			if (nk == 0) {
 			} else {
 				const auto W = twiddle(nk, N);
-				print("tmp = x[%i];\n", index(o, k2 * N1 + n1, 0, N1));
-				print("x[%i] = (%.17e) * tmp - %.17e * x[%i];\n", index(o, k2 * N1 + n1, 0, N), W.real(), W.imag(), index(o, k2 * N1 + n1, 1, N));
-				print("x[%i] = (%.17e) * tmp + %.17e * x[%i];\n", index(o, k2 * N1 + n1, 1, N), W.imag(), W.real(), index(o, k2 * N1 + n1, 1, N));
+				print("tmp = x[%i];\n", index(o, k2 * N1 + n1, 0, N));
+				print("x[%i] = std::fma((%.17e), tmp, (%.17e) * x[%i]);\n", index(o, k2 * N1 + n1, 0, N), W.real(), -W.imag(), index(o, k2 * N1 + n1, 1, N));
+				print("x[%i] = std::fma((%.17e), tmp, (%.17e) * x[%i]);\n", index(o, k2 * N1 + n1, 1, N), W.imag(), W.real(), index(o, k2 * N1 + n1, 1, N));
 			}
 		}
 	}
@@ -401,8 +401,8 @@ void raders_fft(int r, int N, int o) {
 		print("x[%i] = -x[%i];\n", index(o, k2 * N1, 0, N), index(o, k2 * N1, 0, N));
 		for (int q = 1; q < N1 - 1; q++) {
 			print("tmp = x[%i];\n", index(o, k2 * N1 + q, 0, N));
-			print("x[%i] = (%.17e) * tmp - %.17e * x[%i];\n", index(o, k2 * N1 + q, 0, N), b[q].real(), b[q].imag(), index(o, k2 * N1 + q, 1, N));
-			print("x[%i] = -(%.17e) * tmp - %.17e * x[%i];\n", index(o, k2 * N1 + q, 1, N), b[q].imag(), b[q].real(), index(o, k2 * N1 + q, 1, N));
+			print("x[%i] = std::fma((%.17e), tmp, (%.17e) * x[%i]);\n", index(o, k2 * N1 + q, 0, N), b[q].real(), -b[q].imag(), index(o, k2 * N1 + q, 1, N));
+			print("x[%i] = std::fma((%.17e), tmp, (%.17e) * x[%i]);\n", index(o, k2 * N1 + q, 1, N), -b[q].imag(), -b[q].real(), index(o, k2 * N1 + q, 1, N));
 		}
 	}
 
@@ -489,39 +489,31 @@ void print_z(int zi, int k, int r, int N, int o) {
 	if (zi * k == 0) {
 		print("const auto zr%i = x[%i];\n", zi, index(o, i, 0, N));
 		print("const auto zi%i = x[%i];\n", zi, index(o, i, 1, N));
-		return;
 	} else if (zi * k == N / 8 && N % 8 == 0) {
 		print("const auto zr%i = M_SQRT1_2 * (x[%i] + x[%i]);\n", zi, index(o, i, 0, N), index(o, i, 1, N));
 		print("const auto zi%i = -M_SQRT1_2 * (x[%i] - x[%i]);\n", zi, index(o, i, 0, N), index(o, i, 1, N));
-		return;
 	} else if (zi * k == N / 4 && N % 4 == 0) {
 		print("const auto zr%i = x[%i];\n", zi, index(o, i, 1, N));
 		print("const auto zi%i = -x[%i];\n", zi, index(o, i, 0, N));
-		return;
 	} else if (zi * k == 3 * N / 8 && N % 8 == 0) {
 		print("const auto zr%i = -M_SQRT1_2 * (x[%i] - x[%i]);\n", zi, index(o, i, 0, N), index(o, i, 1, N));
 		print("const auto zi%i = -M_SQRT1_2 * (x[%i] + x[%i]);\n", zi, index(o, i, 0, N), index(o, i, 1, N));
-		return;
 	} else if (zi * k == N / 2 && N % 2 == 0) {
 		print("const auto zr%i = -x[%i];\n", zi, index(o, i, 0, N));
 		print("const auto zi%i = -x[%i];\n", zi, index(o, i, 1, N));
-		return;
 	} else if (zi * k == 5 * N / 8 && N % 8 == 0) {
 		print("const auto zr%i = -M_SQRT1_2 * (x[%i] + x[%i]);\n", zi, index(o, i, 0, N), index(o, i, 1, N));
 		print("const auto zi%i = M_SQRT1_2 * (x[%i] - x[%i]);\n", zi, index(o, i, 0, N), index(o, i, 1, N));
-		return;
 	} else if (zi * k == 3 * N / 4 && N % 4 == 0) {
 		print("const auto zr%i = -x[%i];\n", zi, index(o, i, 1, N));
 		print("const auto zi%i = x[%i];\n", zi, index(o, i, 0, N));
-		return;
 	} else if (zi * k == 7 * N / 8 && N % 8 == 0) {
 		print("const auto zr%i = M_SQRT1_2 * (x[%i] - x[%i];\n", zi, index(o, i, 0, N), index(o, i, 1, N));
 		print("const auto zi%i = M_SQRT1_2 * (x[%i] + x[%i]);\n", zi, index(o, i, 0, N), index(o, i, 1, N));
-		return;
+	} else {
+		print("const auto zr%i = std::fma((%.17e), x[%i], (%.17e) * x[%i]);\n", zi, W.real(), index(o, i, 0, N), -W.imag(), index(o, i, 1, N));
+		print("const auto zi%i = std::fma((%.17e), x[%i], (%.17e) * x[%i]);\n", zi, W.real(), index(o, i, 1, N), W.imag(), index(o, i, 0, N));
 	}
-
-	print("const auto zr%i = (%.17e) * x[%i] - (%.17e) * x[%i];\n", zi, W.real(), index(o, i, 0, N), W.imag(), index(o, i, 1, N));
-	print("const auto zi%i = (%.17e) * x[%i] + (%.17e) * x[%i];\n", zi, W.real(), index(o, i, 1, N), W.imag(), index(o, i, 0, N));
 }
 
 int best_radix(int N, int o) {
@@ -825,10 +817,10 @@ void fft_radix(int r, int N, int o) {
 				print_z(i, k, r, N, o);
 			}
 			print("const auto tr1 = zr1 + zr2;\n");
-			print("const auto tr2 = zr0 - tr1 * 0.5;\n");
+			print("const auto tr2 = std::fma(tr1, -0.5, zr0);\n");
 			print("const auto tr3 = (%24.17e) * (zr1 - zr2);\n", sqrt(3) * 0.5);
 			print("const auto ti1 = zi1 + zi2;\n");
-			print("const auto ti2 = zi0 - ti1 * 0.5;\n");
+			print("const auto ti2 = std::fma(ti1, -0.5, zi0);\n");
 			print("const auto ti3 = (%24.17e) * (zi1 - zi2);\n", sqrt(3) * 0.5);
 			print("x[%i] = zr0 + tr1;\n", index(o, k, 0, N));
 			print("x[%i] = zi0 + ti1;\n", index(o, k, 1, N));
@@ -899,8 +891,8 @@ void fft_radix(int r, int N, int o) {
 			print("const auto tr7 = zr0 - tr5 * 0.25;\n");
 			print("const auto tr8 = tr7 + tr6;\n");
 			print("const auto tr9 = tr7 - tr6;\n");
-			print("const auto tr10 = (%24.17e) * tr3 + (%24.17e) * tr4;\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
-			print("const auto tr11 = (%24.17e) * tr3 - (%24.17e) * tr4;\n", sin(2.0 * M_PI / 10.0), sin(2.0 * M_PI / 5.0));
+			print("const auto tr10 = std::fma((%24.17e), tr3, (%24.17e) * tr4);\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
+			print("const auto tr11 = std::fma((%24.17e), tr3, (%24.17e) * tr4);\n", sin(2.0 * M_PI / 10.0), -sin(2.0 * M_PI / 5.0));
 			print("const auto ti1 = zi1 + zi4;\n");
 			print("const auto ti2 = zi2 + zi3;\n");
 			print("const auto ti3 = zi1 - zi4;\n");
@@ -910,8 +902,8 @@ void fft_radix(int r, int N, int o) {
 			print("const auto ti7 = zi0 - ti5 * 0.25;\n");
 			print("const auto ti8 = ti7 + ti6;\n");
 			print("const auto ti9 = ti7 - ti6;\n");
-			print("const auto ti10 = (%24.17e) * ti3 + (%24.17e) * ti4;\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
-			print("const auto ti11 = (%24.17e) * ti3 - (%24.17e) * ti4;\n", sin(2.0 * M_PI / 10.0), sin(2.0 * M_PI / 5.0));
+			print("const auto ti10 = std::fma((%24.17e), ti3, (%24.17e) * ti4);\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
+			print("const auto ti11 = std::fma((%24.17e), ti3, (%24.17e) * ti4);\n", sin(2.0 * M_PI / 10.0), -sin(2.0 * M_PI / 5.0));
 			print("x[%i] = zr0 + tr5;\n", index(o, k + 0 * N / 5, 0, N));
 			print("x[%i] = zi0 + ti5;\n", index(o, k + 0 * N / 5, 1, N));
 			print("x[%i] = tr8 + ti10;\n", index(o, k + 1 * N / 5, 0, N));
@@ -943,14 +935,14 @@ void fft_radix(int r, int N, int o) {
 			}
 			print("const auto tr1 = zr2 + zr4;\n");
 			print("const auto ti1 = zi2 + zi4;\n");
-			print("const auto tr2 = zr0 - tr1 * 0.5;\n");
-			print("const auto ti2 = zi0 - ti1 * 0.5;\n");
+			print("const auto tr2 = std::fma(tr1, -0.5, zr0);");
+			print("const auto ti2 = std::fma(ti1, -0.5, zi0);");
 			print("const auto tr3 = (%24.17e) * (zr2 - zr4);\n", sin(M_PI / 3.0));
 			print("const auto ti3 = (%24.17e) * (zi2 - zi4);\n", sin(M_PI / 3.0));
 			print("const auto tr4 = zr5 + zr1;\n");
 			print("const auto ti4 = zi5 + zi1;\n");
-			print("const auto tr5 = zr3 - tr4 * 0.5;\n");
-			print("const auto ti5 = zi3 - ti4 * 0.5;\n");
+			print("const auto tr5 = std::fma(tr4, -0.5, zr3);");
+			print("const auto ti5 = std::fma(ti4, -0.5, zi3);");
 			print("const auto tr6 = (%24.17e) * (zr5 - zr1);\n", sin(M_PI / 3.0));
 			print("const auto ti6 = (%24.17e) * (zi5 - zi1);\n", sin(M_PI / 3.0));
 			print("const auto tr7 = zr0 + tr1;\n");
@@ -1015,55 +1007,18 @@ void fft_radix(int r, int N, int o) {
 					print("const auto tym%i = zi%i - zi%i;\n", j, j, r - j);
 				}
 				for (int i = 1; i <= (r - 1) / 2; i++) {
-					print("const auto ap%i = zr0", i);
+					print("auto ap%i = zr0;\n", i);
+					print("auto bp%i = zi0;\n", i);
 					for (int j = 1; j <= (r - 1) / 2; j++) {
-						if (!null) {
-							fprintf(fp, " + ");
-							fprintf(fp, "txp%i * (%24.17e)", j, cos(2.0 * M_PI * j * i / r));
+						print("ap%i = std::fma(txp%i, (%24.17e), ap%i);\n", i, j, cos(2.0 * M_PI * j * i / r), i);
+						print("bp%i = std::fma(typ%i, (%24.17e), bp%i);\n", i, j, cos(2.0 * M_PI * j * i / r), i);
+						if( j == 1 ) {
+							print("double am%i = tym%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / r));
+							print("double bm%i = txm%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / r));
+						} else {
+							print("am%i = std::fma(tym%i, (%24.17e), am%i);\n", i, j, sin(2.0 * M_PI * j * i / r), i);
+							print("bm%i = std::fma(txm%i, (%24.17e), bm%i);\n", i, j, sin(2.0 * M_PI * j * i / r), i);
 						}
-					}
-					if (!null) {
-						fprintf(fp, ";\n");
-					}
-				}
-				for (int i = 1; i <= (r - 1) / 2; i++) {
-					print("const auto bp%i = zi0", i);
-					for (int j = 1; j <= (r - 1) / 2; j++) {
-						if (!null) {
-							fprintf(fp, " + ");
-							fprintf(fp, "typ%i * (%24.17e)", j, cos(2.0 * M_PI * j * i / r));
-						}
-					}
-					if (!null) {
-						fprintf(fp, ";\n");
-					}
-				}
-				for (int i = 1; i <= (r - 1) / 2; i++) {
-					print("const auto am%i = ", i);
-					for (int j = 1; j <= (r - 1) / 2; j++) {
-						if (!null) {
-							if (j > 1) {
-								fprintf(fp, " + ");
-							}
-							fprintf(fp, "tym%i * (%24.17e)", j, sin(2.0 * M_PI * j * i / r));
-						}
-					}
-					if (!null) {
-						fprintf(fp, ";\n");
-					}
-				}
-				for (int i = 1; i <= (r - 1) / 2; i++) {
-					print("const auto bm%i = ", i);
-					for (int j = 1; j <= (r - 1) / 2; j++) {
-						if (!null) {
-							if (j > 1) {
-								fprintf(fp, " + ");
-							}
-							fprintf(fp, "txm%i * (%24.17e)", j, sin(2.0 * M_PI * j * i / r));
-						}
-					}
-					if (!null) {
-						fprintf(fp, ";\n");
 					}
 				}
 				print("x[%i] = ", index(o, k, 0, N));
