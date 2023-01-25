@@ -34,6 +34,8 @@ void clear_null() {
 	null = false;
 }
 
+constexpr int NPAR = 4;
+
 void set_file(std::string str) {
 	if (fp) {
 		fclose(fp);
@@ -320,10 +322,13 @@ void raders_fft(int r, int N, int o) {
 	const int N2 = N / r;
 	print("{\n");
 	indent();
-	print("// Raders radix - %i x %i\n", N1, N2);
+	print("// Raders radix - %i = %i x %i\n", N, N1, N2);
+	printf("// Raders radix - %i = %i x %i\n", N, N1, N2);
 	print("std::array<double, %i> xro, xrk0;\n", N2);
 	print("std::array<double, %i> xio, xik0;\n", N2);
-	print("double tmp;\n");
+	for (int n = 0; n < NPAR; n++) {
+		print("double tmp%i;\n", n);
+	}
 	if (N2 > 1) {
 		std::vector<int> I1(N);
 		auto I2 = fft_bitreverse_indices(N2);
@@ -356,9 +361,9 @@ void raders_fft(int r, int N, int o) {
 			if (nk == 0) {
 			} else {
 				const auto W = twiddle(nk, N);
-				print("tmp = x[%i];\n", index(o, k2 * N1 + n1, 0, N));
-				print("x[%i] = std::fma((%.17e), tmp, (%.17e) * x[%i]);\n", index(o, k2 * N1 + n1, 0, N), W.real(), -W.imag(), index(o, k2 * N1 + n1, 1, N));
-				print("x[%i] = std::fma((%.17e), tmp, (%.17e) * x[%i]);\n", index(o, k2 * N1 + n1, 1, N), W.imag(), W.real(), index(o, k2 * N1 + n1, 1, N));
+				print("tmp0 = x[%i];\n", index(o, k2 * N1 + n1, 0, N));
+				print("x[%i] = std::fma((%.17e), x[%i], (%.17e) * x[%i]);\n", index(o, k2 * N1 + n1, 0, N), W.real(), index(o, k2 * N1 + n1, 0, N), -W.imag(), index(o, k2 * N1 + n1, 1, N));
+				print("x[%i] = std::fma((%.17e), tmp0, (%.17e) * x[%i]);\n", index(o, k2 * N1 + n1, 1, N), W.imag(), W.real(), index(o, k2 * N1 + n1, 1, N));
 			}
 		}
 	}
@@ -400,9 +405,9 @@ void raders_fft(int r, int N, int o) {
 	for (int k2 = 0; k2 < N2; k2++) {
 		print("x[%i] = -x[%i];\n", index(o, k2 * N1, 0, N), index(o, k2 * N1, 0, N));
 		for (int q = 1; q < N1 - 1; q++) {
-			print("tmp = x[%i];\n", index(o, k2 * N1 + q, 0, N));
-			print("x[%i] = std::fma((%.17e), tmp, (%.17e) * x[%i]);\n", index(o, k2 * N1 + q, 0, N), b[q].real(), -b[q].imag(), index(o, k2 * N1 + q, 1, N));
-			print("x[%i] = std::fma((%.17e), tmp, (%.17e) * x[%i]);\n", index(o, k2 * N1 + q, 1, N), -b[q].imag(), -b[q].real(), index(o, k2 * N1 + q, 1, N));
+			print("tmp0 = x[%i];\n", index(o, k2 * N1 + q, 0, N));
+			print("x[%i] = std::fma((%.17e), x[%i], (%.17e) * x[%i]);\n", index(o, k2 * N1 + q, 0, N), b[q].real(), index(o, k2 * N1 + q, 0, N), -b[q].imag(), index(o, k2 * N1 + q, 1, N));
+			print("x[%i] = std::fma((%.17e), tmp0, (%.17e) * x[%i]);\n", index(o, k2 * N1 + q, 1, N), -b[q].imag(), -b[q].real(), index(o, k2 * N1 + q, 1, N));
 		}
 	}
 
@@ -442,22 +447,58 @@ void raders_fft(int r, int N, int o) {
 	print("}\n");
 }
 
+constexpr double mweight = 2;
+
 int raders_fft_opcnt(int r, int N) {
 	int cnt = 0;
 	const int N1 = r;
 	const int N2 = N / r;
 	if (N2 > 1) {
-		cnt += N;
-		cnt += N1 * fft_opcnt(N2);
-		cnt += N;
+		cnt += mweight * N;
+		for (int n1 = 0; n1 < N1; n1++) {
+			cnt += fft_opcnt(N2);
+		}
 	}
-	cnt += 6 * (N - 1);
+
 	for (int k2 = 0; k2 < N2; k2++) {
-		cnt += 5;
-		cnt += 2 * fft_opcnt(N1 - 1);
-		cnt += 12 * (N1 - 1);
-		cnt += 2 * N1;
+		for (int n1 = 0; n1 < N1; n1++) {
+			const int nk = (n1 * k2) % N;
+			if (nk != 0) {
+				cnt += 2;
+			}
+		}
 	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		for (int k1 = 1; k1 < N1; k1++) {
+			cnt += 2;
+		}
+	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		cnt += mweight * (N1 - 1);
+		cnt += fft_opcnt(N1 - 1);
+	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		cnt++;
+		for (int q = 1; q < N1 - 1; q++) {
+			cnt += 2;
+		}
+	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		cnt += mweight * (N1 - 1);
+		cnt += fft_opcnt(N1 - 1);
+	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		const auto Nm1inv = 1.0 / (N1 - 1.0);
+		for (int q = 0; q < N1 - 1; q++) {
+			cnt += 3;
+		}
+	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		for (int p = N1 - 2; p >= 0; p--) {
+			cnt += 2;
+		}
+	}
+	cnt += mweight * N;
 	return cnt;
 }
 
@@ -479,7 +520,7 @@ int print_z_opcnt(int zi, int k, int r, int N) {
 	} else if (zi * k == 7 * N / 8 && N % 8 == 0) {
 		return 4;
 	} else {
-		return 6;
+		return 4;
 	}
 }
 
@@ -523,7 +564,7 @@ int best_radix(int N, int o) {
 		if (N % r == 0) {
 			int this_cnt;
 			if (r <= 6 || is_prime(r)) {
-				this_cnt = fft_radix_opcnt(r, N);
+				this_cnt = fft_radix_opcnt(r, N) + mweight * N;
 				if (this_cnt < best_cnt) {
 					best_cnt = this_cnt;
 					best_radix = r;
@@ -555,7 +596,7 @@ int fft_opcnt(int N) {
 	for (int r = 2; r <= N; r++) {
 		if (N % r == 0) {
 			if (r <= 6 || is_prime(r)) {
-				const int this_cnt = fft_radix_opcnt(r, N);
+				const int this_cnt = fft_radix_opcnt(r, N) + mweight * N;
 				if (this_cnt < best_cnt) {
 					best_cnt = this_cnt;
 					best_radix = r;
@@ -608,7 +649,7 @@ int fft_radix_opcnt(int r, int N) {
 			for (int i = 0; i < 3; i++) {
 				cnt += print_z_opcnt(i, k, 3, N);
 			}
-			cnt += 20;
+			cnt += 14;
 		}
 		return cnt;
 	case 4:
@@ -626,7 +667,7 @@ int fft_radix_opcnt(int r, int N) {
 			for (int i = 0; i < 4; i++) {
 				cnt += print_z_opcnt(i, k, 4, N);
 			}
-			cnt += 18;
+			cnt += 16;
 		}
 		return cnt;
 	case 5:
@@ -645,7 +686,7 @@ int fft_radix_opcnt(int r, int N) {
 			for (int i = 0; i < 5; i++) {
 				cnt += print_z_opcnt(i, k, 5, N);
 			}
-			cnt += 48;
+			cnt += 34;
 		}
 		return cnt;
 	case 6:
@@ -665,7 +706,7 @@ int fft_radix_opcnt(int r, int N) {
 			for (int i = 0; i < 6; i++) {
 				cnt += print_z_opcnt(i, k, 6, N);
 			}
-			cnt += 48;
+			cnt += 40;
 		}
 		return cnt;
 	default:
@@ -682,29 +723,17 @@ int fft_radix_opcnt(int r, int N) {
 			for (int i = 0; i < r; i++) {
 				cnt += print_z_opcnt(i, k, r, N);
 			}
-
-			for (int j = 1; j <= (r - 1) / 2; j++) {
-				cnt += 4;
-			}
 			for (int i = 1; i <= (r - 1) / 2; i++) {
+				cnt += 4;
 				for (int j = 1; j <= (r - 1) / 2; j++) {
 					cnt += 4;
 				}
 			}
-
-			for (int i = 1; i <= (r - 1) / 2; i++) {
-				for (int j = 1; j <= (r - 1) / 2; j++) {
-					if (j > 1) {
-						cnt += 2;
-					}
-					cnt += 2;
-				}
-			}
 			for (int i = 1; i < r; i++) {
-				cnt++;
+				cnt += 2;
 			}
 			for (int i = 1; i <= (r - 1) / 2; i++) {
-				cnt += 14;
+				cnt += 4;
 			}
 		}
 		return cnt;
@@ -722,29 +751,84 @@ std::vector<int> fft_bitreverse_indices(int N) {
 	return indices;
 }
 
+#include <list>
+
 void fft_bitreverse(int N, std::vector<int> indices, int o) {
 	if (indices.size() == 0) {
 		indices = fft_bitreverse_indices(N);
 	}
+	std::vector<std::list<int>> strings;
 	for (int l = 0; l < 2; l++) {
 		std::vector<bool> touched(N, false);
 		for (int k = 0; k < N; k++) {
 			if (!touched[k]) {
+				std::list<int> string;
 				int current = k;
 				int first = current;
 				int next = indices[current];
 				touched[current] = true;
 				if (first != next) {
-					print("tmp = x[%i];\n", index(o, current, l, N));
+					string.push_back(-1);
+					string.push_back(index(o, current, l, N));
 					while (first != next) {
-						print("x[%i] = x[%i];\n", index(o, current, l, N), index(o, next, l, N));
+						string.push_back(index(o, next, l, N));
 						current = next;
 						touched[current] = true;
 						next = indices[next];
 					}
-					print("x[%i] = tmp;\n", index(o, current, l, N));
+				}
+				strings.push_back(string);
+			}
+		}
+	}
+	while (strings.size()) {
+		for (int n = 0; n < NPAR; n++) {
+			if (strings.size() > n) {
+				while (!strings[n].size()) {
+					if (strings.size() > NPAR) {
+						strings[n] = strings.back();
+						strings.pop_back();
+					} else {
+						break;
+					}
+				}
+				if (strings[n].size()) {
+					if (strings[n].front() == -1) {
+						strings[n].pop_front();
+						if (strings[n].size()) {
+							print("tmp%i = x[%i];\n", n, strings[n].front());
+						}
+					} else {
+						int to = strings[n].front();
+						strings[n].pop_front();
+						if (strings[n].size()) {
+							print("x[%i] = x[%i];\n", to, strings[n].front());
+						} else {
+							print("x[%i] = tmp%i;\n", to, n);
+						}
+					}
+					while (!strings[n].size()) {
+						if (strings.size() > NPAR) {
+							strings[n] = strings.back();
+							strings.pop_back();
+						} else {
+							break;
+						}
+					}
 				}
 			}
+		}
+		bool done = true;
+		for (int n = 0; n < NPAR; n++) {
+			if (strings.size() > n) {
+				if (strings[n].size()) {
+					done = false;
+					break;
+				}
+			}
+		}
+		if (done) {
+			strings.resize(0);
 		}
 	}
 }
@@ -756,9 +840,9 @@ void fft(int N, int o) {
 	int radix = best_radix(N, o);
 //	if (radix > 0) {
 	fft_radix(radix, N, o);
-//	} else if (radix == -1) {
-//		bluestein_fft(N, o);
-//	}
+	//} else if (radix == -1) {
+	//	bluestein_fft(N, o);
+	//}
 }
 
 std::vector<int> fft_bitr(int N, int o, std::vector<int> indices) {
@@ -766,11 +850,11 @@ std::vector<int> fft_bitr(int N, int o, std::vector<int> indices) {
 		return indices;
 	}
 	int radix = best_radix(N, o);
-//	if (radix > 0) {
-	return fft_radix_bitr(radix, N, o, indices);
-//	} else {
-//		return indices;
-//	}
+	if (radix > 0) {
+		return fft_radix_bitr(radix, N, o, indices);
+	} else {
+		return indices;
+	}
 }
 
 void fft_radix(int r, int N, int o) {
@@ -888,7 +972,7 @@ void fft_radix(int r, int N, int o) {
 			print("const auto tr4 = zr2 - zr3;\n");
 			print("const auto tr5 = tr1 + tr2;\n");
 			print("const auto tr6 = (%24.17e) * (tr1 - tr2);\n", sqrt(5) * 0.25);
-			print("const auto tr7 = zr0 - tr5 * 0.25;\n");
+			print("const auto tr7 = std::fma(tr5, -0.25, zr0);\n");
 			print("const auto tr8 = tr7 + tr6;\n");
 			print("const auto tr9 = tr7 - tr6;\n");
 			print("const auto tr10 = std::fma((%24.17e), tr3, (%24.17e) * tr4);\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
@@ -899,7 +983,7 @@ void fft_radix(int r, int N, int o) {
 			print("const auto ti4 = zi2 - zi3;\n");
 			print("const auto ti5 = ti1 + ti2;\n");
 			print("const auto ti6 = (%24.17e) * (ti1 - ti2);\n", sqrt(5) * 0.25);
-			print("const auto ti7 = zi0 - ti5 * 0.25;\n");
+			print("const auto ti7 = std::fma(ti5, -0.25, zi0);\n");
 			print("const auto ti8 = ti7 + ti6;\n");
 			print("const auto ti9 = ti7 - ti6;\n");
 			print("const auto ti10 = std::fma((%24.17e), ti3, (%24.17e) * ti4);\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
@@ -935,14 +1019,14 @@ void fft_radix(int r, int N, int o) {
 			}
 			print("const auto tr1 = zr2 + zr4;\n");
 			print("const auto ti1 = zi2 + zi4;\n");
-			print("const auto tr2 = std::fma(tr1, -0.5, zr0);");
-			print("const auto ti2 = std::fma(ti1, -0.5, zi0);");
+			print("const auto tr2 = std::fma(tr1, -0.5, zr0);\n");
+			print("const auto ti2 = std::fma(ti1, -0.5, zi0);\n");
 			print("const auto tr3 = (%24.17e) * (zr2 - zr4);\n", sin(M_PI / 3.0));
 			print("const auto ti3 = (%24.17e) * (zi2 - zi4);\n", sin(M_PI / 3.0));
 			print("const auto tr4 = zr5 + zr1;\n");
 			print("const auto ti4 = zi5 + zi1;\n");
-			print("const auto tr5 = std::fma(tr4, -0.5, zr3);");
-			print("const auto ti5 = std::fma(ti4, -0.5, zi3);");
+			print("const auto tr5 = std::fma(tr4, -0.5, zr3);\n");
+			print("const auto ti5 = std::fma(ti4, -0.5, zi3);\n");
 			print("const auto tr6 = (%24.17e) * (zr5 - zr1);\n", sin(M_PI / 3.0));
 			print("const auto ti6 = (%24.17e) * (zi5 - zi1);\n", sin(M_PI / 3.0));
 			print("const auto tr7 = zr0 + tr1;\n");
@@ -1012,7 +1096,7 @@ void fft_radix(int r, int N, int o) {
 					for (int j = 1; j <= (r - 1) / 2; j++) {
 						print("ap%i = std::fma(txp%i, (%24.17e), ap%i);\n", i, j, cos(2.0 * M_PI * j * i / r), i);
 						print("bp%i = std::fma(typ%i, (%24.17e), bp%i);\n", i, j, cos(2.0 * M_PI * j * i / r), i);
-						if( j == 1 ) {
+						if (j == 1) {
 							print("double am%i = tym%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / r));
 							print("double bm%i = txm%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / r));
 						} else {
@@ -1129,7 +1213,9 @@ void print_fft(int N) {
 	print("#include \"fft.hpp\"\n");
 	print("\nvoid fft_%i(std::complex<double>* x0) {\n", N);
 	indent();
-	print("double tmp;\n");
+	for (int n = 0; n < NPAR; n++) {
+		print("double tmp%i;\n", n);
+	}
 	print("double* x = reinterpret_cast<double*>(x0);\n");
 	std::vector<int> I;
 	for (int n = 0; n < N; n++) {
