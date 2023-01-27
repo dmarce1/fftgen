@@ -473,7 +473,7 @@ void raders_fft(int r, int N, int o, int s) {
 	print("}\n");
 }
 
-constexpr double mweight = 1.25;
+constexpr double mweight = 1.5;
 
 int raders_fft_opcnt(int r, int N, int s) {
 	int cnt = 0;
@@ -623,7 +623,7 @@ fft_type best_radix(int N, int o, int s, bool first = false) {
 	for (int r = 2; r <= N; r++) {
 		if (N % r == 0) {
 			int this_cnt;
-			if (r <= 6 || r == 10 || is_prime(r)) {
+			if (r <= 6 || r == 10 || r == 12 || is_prime(r)) {
 				this_cnt = fft_radix_opcnt(r, N, s);
 				if (first) {
 					this_cnt += N * mweight;
@@ -748,6 +748,21 @@ int fft_radix_opcnt(int r, int N, int s) {
 		for (int k = 0; k < N / 5; k++) {
 			for (int i = 0; i < 5; i++) {
 				cnt += print_z_opcnt(i, k, 5, N);
+			}
+			cnt += 34;
+		}
+		return cnt;
+	case 12:
+		if (N < 12) {
+			return 0;
+		}
+		cnt = 0;
+		if (N > 12) {
+			cnt += 12 * fft_opcnt(N / 12, s);
+		}
+		for (int k = 0; k < N / 12; k++) {
+			for (int i = 0; i < 12; i++) {
+				cnt += print_z_opcnt(i, k, 12, N);
 			}
 			cnt += 34;
 		}
@@ -1051,6 +1066,148 @@ void fft_radix(int r, int N, int o, int s) {
 			print("x[%i] = ti1 - ti2;\n", index(o, s, k + N / 2, 1));
 			print("x[%i] = tr3 - ti4;\n", index(o, s, k + 3 * N / 4, 0));
 			print("x[%i] = ti3 + tr4;\n", index(o, s, k + 3 * N / 4, 1));
+			deindent();
+			print("}\n");
+		}
+		deindent();
+		print("}\n");
+		break;
+	case 12:
+		print("{\n");
+		print("// radix - 12\n");
+		indent();
+		for (int n = 0; n < 12; n++) {
+			if (n % 3 == 0) {
+				//			continue;
+			}
+			fft(N / 12, o + n * N / 12, s);
+		}
+		for (int k = 0; k < N / 12; k++) {
+			print("{\n");
+			indent();
+			print_z(0, 0, 0, k, r, N, o, s);
+			print_z(1, 4, 4, k, r, N, o, s);
+			print_z(2, 8, 8, k, r, N, o, s);
+			print_z(3, 3, 3, k, r, N, o, s);
+			print_z(4, 7, 7, k, r, N, o, s);
+			print_z(5, 11, 11, k, r, N, o, s);
+			print_z(6, 6, 6, k, r, N, o, s);
+			print_z(7, 10, 10, k, r, N, o, s);
+			print_z(8, 2, 2, k, r, N, o, s);
+			print_z(9, 9, 9, k, r, N, o, s);
+			print_z(10, 1, 1, k, r, N, o, s);
+			print_z(11, 5, 5, k, r, N, o, s);
+
+			print("auto tr1 = zr1 + zr2;\n");
+			print("auto ti1 = zi1 + zi2;\n");
+			print("auto tr2 = std::fma(tr1, -0.5, zr0);\n");
+			print("auto ti2 = std::fma(ti1, -0.5, zi0);\n");
+			print("auto tr3 = (%24.17e) * (zr1 - zr2);\n", sqrt(3) * 0.5);
+			print("auto ti3 = (%24.17e) * (zi1 - zi2);\n", sqrt(3) * 0.5);
+
+			print("auto tr4 = zr4 + zr5;\n");
+			print("auto ti4 = zi4 + zi5;\n");
+			print("auto tr5 = std::fma(tr4, -0.5, zr3);\n");
+			print("auto ti5 = std::fma(ti4, -0.5, zi3);\n");
+			print("auto tr6 = (%24.17e) * (zr4 - zr5);\n", sqrt(3) * 0.5);
+			print("auto ti6 = (%24.17e) * (zi4 - zi5);\n", sqrt(3) * 0.5);
+
+			print("auto tr7 = zr7 + zr8;\n");
+			print("auto ti7 = zi7 + zi8;\n");
+			print("auto tr8 = std::fma(tr7, -0.5, zr6);\n");
+			print("auto ti8 = std::fma(ti7, -0.5, zi6);\n");
+			print("auto tr9 = (%24.17e) * (zr7 - zr8);\n", sqrt(3) * 0.5);
+			print("auto ti9 = (%24.17e) * (zi7 - zi8);\n", sqrt(3) * 0.5);
+
+			print("auto tr10 = zr10 + zr11;\n");
+			print("auto ti10 = zi10 + zi11;\n");
+			print("auto tr11 = std::fma(tr10, -0.5, zr9);\n");
+			print("auto ti11 = std::fma(ti10, -0.5, zi9);\n");
+			print("auto tr12 = (%24.17e) * (zr10 - zr11);\n", sqrt(3) * 0.5);
+			print("auto ti12 = (%24.17e) * (zi10 - zi11);\n", sqrt(3) * 0.5);
+
+			print("const auto ar1 = zr0 + tr1;\n");
+			print("const auto ai1 = zi0 + ti1;\n");
+			print("const auto ar5 = tr2 + ti3;\n");
+			print("const auto ai5 = ti2 - tr3;\n");
+			print("const auto ar9 = tr2 - ti3;\n");
+			print("const auto ai9 = ti2 + tr3;\n");
+
+			print("const auto ar2 = zr3 + tr4;\n");
+			print("const auto ai2 = zi3 + ti4;\n");
+			print("const auto ar6 = tr5 + ti6;\n");
+			print("const auto ai6 = ti5 - tr6;\n");
+			print("const auto ar10 = tr5 - ti6;\n");
+			print("const auto ai10 = ti5 + tr6;\n");
+
+			print("const auto ar3 = zr6 + tr7;\n");
+			print("const auto ai3 = zi6 + ti7;\n");
+			print("const auto ar7 = tr8 + ti9;\n");
+			print("const auto ai7 = ti8 - tr9;\n");
+			print("const auto ar11 = tr8 - ti9;\n");
+			print("const auto ai11 = ti8 + tr9;\n");
+
+			print("const auto ar4 = zr9 + tr10;\n");
+			print("const auto ai4 = zi9 + ti10;\n");
+			print("const auto ar8 = tr11 + ti12;\n");
+			print("const auto ai8 = ti11 - tr12;\n");
+			print("const auto ar12 = tr11 - ti12;\n");
+			print("const auto ai12 = ti11 + tr12;\n");
+
+			print("tr1 = ar1 + ar3;\n");
+			print("ti1 = ai1 + ai3;\n");
+			print("tr3 = ar1 - ar3;\n");
+			print("ti3 = ai1 - ai3;\n");
+			print("tr2 = ar2 + ar4;\n");
+			print("ti2 = ai2 + ai4;\n");
+			print("tr4 = ar2 - ar4;\n");
+			print("ti4 = ai2 - ai4;\n");
+
+			print("tr5 = ar5 + ar7;\n");
+			print("ti5 = ai5 + ai7;\n");
+			print("tr7 = ar5 - ar7;\n");
+			print("ti7 = ai5 - ai7;\n");
+			print("tr6 = ar6 + ar8;\n");
+			print("ti6 = ai6 + ai8;\n");
+			print("tr8 = ar6 - ar8;\n");
+			print("ti8 = ai6 - ai8;\n");
+
+			print("tr9 = ar9 + ar11;\n");
+			print("ti9 = ai9 + ai11;\n");
+			print("tr11 = ar9 - ar11;\n");
+			print("ti11 = ai9 - ai11;\n");
+			print("tr10 = ar10 + ar12;\n");
+			print("ti10 = ai10 + ai12;\n");
+			print("tr12 = ar10 - ar12;\n");
+			print("ti12 = ai10 - ai12;\n");
+
+			print("x[%i] = tr1 + tr2;\n", index(o, s, k + 0 * N / 12, 0));
+			print("x[%i] = ti1 + ti2;\n", index(o, s, k + 0 * N / 12, 1));
+			print("x[%i] = tr3 + ti4;\n", index(o, s, k + 9 * N / 12, 0));
+			print("x[%i] = ti3 - tr4;\n", index(o, s, k + 9 * N / 12, 1));
+			print("x[%i] = tr1 - tr2;\n", index(o, s, k + 6 * N / 12, 0));
+			print("x[%i] = ti1 - ti2;\n", index(o, s, k + 6 * N / 12, 1));
+			print("x[%i] = tr3 - ti4;\n", index(o, s, k + 3 * N / 12, 0));
+			print("x[%i] = ti3 + tr4;\n", index(o, s, k + 3 * N / 12, 1));
+
+			print("x[%i] = tr5 + tr6;\n", index(o, s, k + 4 * N / 12, 0));
+			print("x[%i] = ti5 + ti6;\n", index(o, s, k + 4 * N / 12, 1));
+			print("x[%i] = tr7 + ti8;\n", index(o, s, k + 1 * N / 12, 0));
+			print("x[%i] = ti7 - tr8;\n", index(o, s, k + 1 * N / 12, 1));
+			print("x[%i] = tr5 - tr6;\n", index(o, s, k + 10 * N / 12, 0));
+			print("x[%i] = ti5 - ti6;\n", index(o, s, k + 10 * N / 12, 1));
+			print("x[%i] = tr7 - ti8;\n", index(o, s, k + 7 * N / 12, 0));
+			print("x[%i] = ti7 + tr8;\n", index(o, s, k + 7 * N / 12, 1));
+
+			print("x[%i] = tr9 + tr10;\n", index(o, s, k + 8* N / 12, 0));
+			print("x[%i] = ti9 + ti10;\n", index(o, s, k + 8 * N / 12, 1));
+			print("x[%i] = tr11 + ti12;\n", index(o, s, k + 5 * N / 12, 0));
+			print("x[%i] = ti11 - tr12;\n", index(o, s, k + 5 * N / 12, 1));
+			print("x[%i] = tr9 - tr10;\n", index(o, s, k + 2 * N / 12, 0));
+			print("x[%i] = ti9 - ti10;\n", index(o, s, k + 2 * N / 12, 1));
+			print("x[%i] = tr11 - ti12;\n", index(o, s, k + 11 * N / 12, 0));
+			print("x[%i] = ti11 + tr12;\n", index(o, s, k + 11 * N / 12, 1));
+
 			deindent();
 			print("}\n");
 		}
@@ -1438,6 +1595,16 @@ std::vector<int> fft_radix_bitr(int r, int N, int o, std::vector<int> I) {
 				J.push_back(I[n + 10 * k]);
 			}
 			auto K = fft_bitr(N / 10, o + (5 + (n / 2)) * N / 10, J);
+			L.insert(L.end(), K.begin(), K.end());
+		}
+		break;
+	case 12:
+		for (int n = 0; n < r; n++) {
+			std::vector<int> J;
+			for (int k = 0; k < N / r; k++) {
+				J.push_back(I[n + r * k]);
+			}
+			auto K = fft_bitr(N / r, o + n * N / r, J);
 			L.insert(L.end(), K.begin(), K.end());
 		}
 		break;
