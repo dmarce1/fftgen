@@ -35,7 +35,7 @@ void clear_null() {
 	null = false;
 }
 
-constexpr int NPAR = 5;
+constexpr int NPAR = 4;
 
 void set_file(std::string str) {
 	if (fp) {
@@ -586,28 +586,28 @@ void print_z(int zi, int xi, int k, int r, int N, int o, int s) {
 void print_z(int zi, int yi, int xi, int k, int r, int N, int o, int s) {
 	const auto W = twiddle(yi * k, N);
 	const int i = k + xi * N / r;
-	if (zi * k == 0) {
+	if (yi * k == 0) {
 		print("const auto zr%i = x[%i];\n", zi, index(o, s, i, 0));
 		print("const auto zi%i = x[%i];\n", zi, index(o, s, i, 1));
-	} else if (zi * k == N / 8 && N % 8 == 0) {
+	} else if (yi * k == N / 8 && N % 8 == 0) {
 		print("const auto zr%i = M_SQRT1_2 * (x[%i] + x[%i]);\n", zi, index(o, s, i, 0), index(o, s, i, 1));
 		print("const auto zi%i = -M_SQRT1_2 * (x[%i] - x[%i]);\n", zi, index(o, s, i, 0), index(o, s, i, 1));
-	} else if (zi * k == N / 4 && N % 4 == 0) {
+	} else if (yi * k == N / 4 && N % 4 == 0) {
 		print("const auto zr%i = x[%i];\n", zi, index(o, s, i, 1));
 		print("const auto zi%i = -x[%i];\n", zi, index(o, s, i, 0));
-	} else if (zi * k == 3 * N / 8 && N % 8 == 0) {
+	} else if (yi * k == 3 * N / 8 && N % 8 == 0) {
 		print("const auto zr%i = -M_SQRT1_2 * (x[%i] - x[%i]);\n", zi, index(o, s, i, 0), index(o, s, i, 1));
 		print("const auto zi%i = -M_SQRT1_2 * (x[%i] + x[%i]);\n", zi, index(o, s, i, 0), index(o, s, i, 1));
-	} else if (zi * k == N / 2 && N % 2 == 0) {
+	} else if (yi * k == N / 2 && N % 2 == 0) {
 		print("const auto zr%i = -x[%i];\n", zi, index(o, s, i, 0));
 		print("const auto zi%i = -x[%i];\n", zi, index(o, s, i, 1));
-	} else if (zi * k == 5 * N / 8 && N % 8 == 0) {
+	} else if (yi * k == 5 * N / 8 && N % 8 == 0) {
 		print("const auto zr%i = -M_SQRT1_2 * (x[%i] + x[%i]);\n", zi, index(o, s, i, 0), index(o, s, i, 1));
 		print("const auto zi%i = M_SQRT1_2 * (x[%i] - x[%i]);\n", zi, index(o, s, i, 0), index(o, s, i, 1));
-	} else if (zi * k == 3 * N / 4 && N % 4 == 0) {
+	} else if (yi * k == 3 * N / 4 && N % 4 == 0) {
 		print("const auto zr%i = -x[%i];\n", zi, index(o, s, i, 1));
 		print("const auto zi%i = x[%i];\n", zi, index(o, s, i, 0));
-	} else if (zi * k == 7 * N / 8 && N % 8 == 0) {
+	} else if (yi * k == 7 * N / 8 && N % 8 == 0) {
 		print("const auto zr%i = M_SQRT1_2 * (x[%i] - x[%i];\n", zi, index(o, s, i, 0), index(o, s, i, 1));
 		print("const auto zi%i = M_SQRT1_2 * (x[%i] + x[%i]);\n", zi, index(o, s, i, 0), index(o, s, i, 1));
 	} else {
@@ -623,7 +623,7 @@ fft_type best_radix(int N, int o, int s, bool first = false) {
 	for (int r = 2; r <= N; r++) {
 		if (N % r == 0) {
 			int this_cnt;
-			if (r <= 6 || r == 10 || r == 12 || is_prime(r)) {
+			if (r <= 6 || r == 10 || is_prime(r)) {
 				this_cnt = fft_radix_opcnt(r, N, s);
 				if (first) {
 					this_cnt += N * mweight;
@@ -646,7 +646,7 @@ fft_type best_radix(int N, int o, int s, bool first = false) {
 			}
 		}
 	}
-	if (N > 6) {
+	if (N > 6 && N != 10) {
 		auto pfac = prime_fac(N);
 		if (pfac.size() == 2) {
 			int N1, N2;
@@ -772,9 +772,7 @@ int fft_radix_opcnt(int r, int N, int s) {
 			return 0;
 		}
 		cnt = 0;
-		if (N > 5) {
-			cnt += fft_opcnt(N / 2, s);
-		}
+		cnt += fft_opcnt(N / 2, s);
 		if (N > 10) {
 			cnt += 5 * fft_opcnt(N / 10, s);
 		}
