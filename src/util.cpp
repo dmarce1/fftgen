@@ -15,7 +15,6 @@ std::string to_str(std::complex<double> z) {
 	return rc;
 }
 
-
 std::unordered_map<int, int> prime_fac(int N) {
 	std::unordered_map<int, int> facs;
 	while (N != 1) {
@@ -28,7 +27,6 @@ std::unordered_map<int, int> prime_fac(int N) {
 	}
 	return facs;
 }
-
 
 int square_factor(int N) {
 	int N1 = sqrt(N);
@@ -67,7 +65,6 @@ int greatest_prime_factor(int N) {
 	return v;
 }
 
-
 void fftw(std::vector<std::complex<double>>& x) {
 	const int N = x.size();
 	static std::unordered_map<int, fftw_plan> plans;
@@ -92,7 +89,6 @@ void fftw(std::vector<std::complex<double>>& x) {
 
 }
 
-
 const std::vector<std::complex<double>> twiddles(int N) {
 	std::vector<std::complex<double>> tw(N);
 	for (int k = 0; k < N; k++) {
@@ -106,6 +102,17 @@ int index(int o, int i, int j, int N) {
 }
 
 int index_real(int o, int i, int j, int N) {
+	if (j == 0) {
+		return o + i;
+	} else {
+		return o + (N - i);
+	}
+}
+
+int index_real_inv(int o, int i, int j, int N) {
+	if (i > N / 2) {
+		return index_real_inv(o, N - i, j, N);
+	}
 	if (j == 0) {
 		return o + i;
 	} else {

@@ -29,6 +29,125 @@ std::vector<int> fft_bitr_real(int N, int o, std::vector<int> indices, bool firs
 }
 
 
+
+std::vector<int> fft_radix_bitr_real(int r, int N, int o, std::vector<int> I) {
+	std::vector<int> L;
+	std::vector<int> J;
+	std::vector<int> K;
+	switch (r) {
+	case 1:
+		return I;
+	/*case 4: {
+		std::vector<int> J;
+		for (int k = 0; k < N / 2; k++) {
+			J.push_back(I[2 * k]);
+		}
+		auto K = fft_bitr_real(N / 2, o, J);
+		L.insert(L.end(), K.begin(), K.end());
+	}
+		for (int n = 1; n < 4; n += 2) {
+			std::vector<int> J;
+			for (int k = 0; k < N / r; k++) {
+				J.push_back(I[n + 4 * k]);
+			}
+			auto K = fft_bitr_real(N / 4, o + (2 + (n / 2)) * N / 4, J);
+			L.insert(L.end(), K.begin(), K.end());
+		}
+		break;*/
+	default:
+		for (int n = 0; n < r; n++) {
+			std::vector<int> J;
+			for (int k = 0; k < N / r; k++) {
+				J.push_back(I[n + r * k]);
+			}
+			auto K = fft_bitr_real(N / r, o + n * N / r, J);
+			L.insert(L.end(), K.begin(), K.end());
+		}
+	};
+	return L;
+}
+
+
+void fft_bitreverse_real(int N, std::vector<int> indices, int o) {
+	if (indices.size() == 0) {
+		indices = fft_bitreverse_indices_real(N);
+	}
+	std::vector<std::list<int>> strings;
+	std::vector<bool> touched(N, false);
+	for (int k = 0; k < N; k++) {
+		if (!touched[k]) {
+			std::list<int> string;
+			int current = k;
+			int first = current;
+			int next = indices[current];
+			touched[current] = true;
+			if (first != next) {
+				string.push_back(-1);
+				string.push_back(index_real(o, current, 0, N));
+				while (first != next) {
+					string.push_back(index_real(o, next, 0, N));
+					current = next;
+					touched[current] = true;
+					next = indices[next];
+				}
+			}
+			strings.push_back(string);
+		}
+	}
+	int n = 0;
+	std::vector<std::vector<std::string>> cmds(NPAR);
+	while (n < strings.size()) {
+		int smallest = 9999999999, smalli;
+		for (int i = 0; i < NPAR; i++) {
+			if (cmds[i].size() < smallest) {
+				smallest = cmds[i].size();
+				smalli = i;
+			}
+		}
+		std::vector<std::string> cmd;
+		char* buf;
+		while (strings[n].size()) {
+			if (strings[n].front() == -1) {
+				strings[n].pop_front();
+				if (strings[n].size()) {
+					asprintf(&buf, "tmp%i = x[%i];\n", smalli, strings[n].front());
+					cmd.push_back(buf);
+					free(buf);
+				}
+			} else {
+				int to = strings[n].front();
+				strings[n].pop_front();
+				if (strings[n].size()) {
+					asprintf(&buf, "x[%i] = x[%i];\n", to, strings[n].front());
+					cmd.push_back(buf);
+					free(buf);
+				} else {
+					asprintf(&buf, "x[%i] = tmp%i;\n", to, smalli);
+					cmd.push_back(buf);
+					free(buf);
+				}
+			}
+		}
+		cmds[smalli].insert(cmds[smalli].end(), cmd.begin(), cmd.end());
+		n++;
+	}
+	n = 0;
+	bool done = false;
+	while (!done) {
+		done = true;
+		for (int j = 0; j < NPAR; j++) {
+			if (cmds[j].size() > n) {
+				print("%s", cmds[j][n].c_str());
+				done = false;
+			}
+		}
+		n++;
+	}
+}
+
+
+
+
 fft_type best_radix_real(int N, int o, bool first) {
 	fft_type fftt;
 	int best_cnt = 999999999;
@@ -53,6 +172,18 @@ fft_type best_radix_real(int N, int o, bool first) {
 	return fftt;
 }
 
+
+void fft_real(int N, int o) {
+	if (N > 1) {
+		fft_type fftt = best_radix_real(N, o);
+		fft_radix_real(fftt.N1, N, o);
+	}
+}
+
+int fft_real_opcnt(int N, int o) {
+	fft_type fftt = best_radix_real(N, o);
+	return fft_radix_real_opcnt(fftt.N1, N, o);
+}
 int fft_radix_real_opcnt(int r, int N, int o) {
 	int cnt = 0;
 	if (N <= 1) {
@@ -154,43 +285,6 @@ int fft_radix_real_opcnt(int r, int N, int o) {
 }
 
 
-
-std::vector<int> fft_radix_bitr_real(int r, int N, int o, std::vector<int> I) {
-	std::vector<int> L;
-	std::vector<int> J;
-	std::vector<int> K;
-	switch (r) {
-	case 1:
-		return I;
-	case 4: {
-		std::vector<int> J;
-		for (int k = 0; k < N / 2; k++) {
-			J.push_back(I[2 * k]);
-		}
-		auto K = fft_bitr_real(N / 2, o, J);
-		L.insert(L.end(), K.begin(), K.end());
-	}
-		for (int n = 1; n < 4; n += 2) {
-			std::vector<int> J;
-			for (int k = 0; k < N / r; k++) {
-				J.push_back(I[n + 4 * k]);
-			}
-			auto K = fft_bitr_real(N / 4, o + (2 + (n / 2)) * N / 4, J);
-			L.insert(L.end(), K.begin(), K.end());
-		}
-		break;
-	default:
-		for (int n = 0; n < r; n++) {
-			std::vector<int> J;
-			for (int k = 0; k < N / r; k++) {
-				J.push_back(I[n + r * k]);
-			}
-			auto K = fft_bitr_real(N / r, o + n * N / r, J);
-			L.insert(L.end(), K.begin(), K.end());
-		}
-	};
-	return L;
-}
 
 void fft_radix_real(int r, int N, int o) {
 	if (N < r) {
@@ -474,82 +568,3 @@ void fft_radix_real(int r, int N, int o) {
 	print("}\n");
 
 }
-
-void fft_bitreverse_real(int N, std::vector<int> indices, int o) {
-	if (indices.size() == 0) {
-		indices = fft_bitreverse_indices_real(N);
-	}
-	std::vector<std::list<int>> strings;
-	std::vector<bool> touched(N, false);
-	for (int k = 0; k < N; k++) {
-		if (!touched[k]) {
-			std::list<int> string;
-			int current = k;
-			int first = current;
-			int next = indices[current];
-			touched[current] = true;
-			if (first != next) {
-				string.push_back(-1);
-				string.push_back(index_real(o, current, 0, N));
-				while (first != next) {
-					string.push_back(index_real(o, next, 0, N));
-					current = next;
-					touched[current] = true;
-					next = indices[next];
-				}
-			}
-			strings.push_back(string);
-		}
-	}
-	int n = 0;
-	std::vector<std::vector<std::string>> cmds(NPAR);
-	while (n < strings.size()) {
-		int smallest = 9999999999, smalli;
-		for (int i = 0; i < NPAR; i++) {
-			if (cmds[i].size() < smallest) {
-				smallest = cmds[i].size();
-				smalli = i;
-			}
-		}
-		std::vector<std::string> cmd;
-		char* buf;
-		while (strings[n].size()) {
-			if (strings[n].front() == -1) {
-				strings[n].pop_front();
-				if (strings[n].size()) {
-					asprintf(&buf, "tmp%i = x[%i];\n", smalli, strings[n].front());
-					cmd.push_back(buf);
-					free(buf);
-				}
-			} else {
-				int to = strings[n].front();
-				strings[n].pop_front();
-				if (strings[n].size()) {
-					asprintf(&buf, "x[%i] = x[%i];\n", to, strings[n].front());
-					cmd.push_back(buf);
-					free(buf);
-				} else {
-					asprintf(&buf, "x[%i] = tmp%i;\n", to, smalli);
-					cmd.push_back(buf);
-					free(buf);
-				}
-			}
-		}
-		cmds[smalli].insert(cmds[smalli].end(), cmd.begin(), cmd.end());
-		n++;
-	}
-	n = 0;
-	bool done = false;
-	while (!done) {
-		done = true;
-		for (int j = 0; j < NPAR; j++) {
-			if (cmds[j].size() > n) {
-				print("%s", cmds[j][n].c_str());
-				done = false;
-			}
-		}
-		n++;
-	}
-}
-
-
