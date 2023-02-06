@@ -421,7 +421,7 @@ int main(int argc, char **argv) {
 	print_notab("\t\ttimer tm1, tm2;\n"
 			"\t\tdouble err;\n"
 			"\t\tdouble max;\n"
-			"\t\tfor (int ti = 0; ti < 1; ti++) {\n"
+			"\t\tfor (int ti = 0; ti < 256; ti++) {\n"
 			"\t\t\terr = 0.0;\n"
 			"\t\t\tmax = 0.0;\n"
 			"\t\t\tstd::vector<std::complex<double>> X(N);\n"
@@ -451,11 +451,11 @@ int main(int argc, char **argv) {
 			"\t\t\t}\n"
 			"\t\t\terr = sqrt(err / N) / max;\n"
 			"\t\t}\n"
-			"\t\tprintf(\"%i %i %e %e %e %e %e %e %e\\n\", N, fft_nops[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());\n"
+			"\t\tprintf(\"%4i %4i %e %e %e %e %e %e %e\\n\", N, fft_nops[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());\n"
 			"");
 	deindent();
 	print("}\n/*return ;*/\n");
-	print("for( int N = 2; N <= %i; N+=%i) {\n", MAXFFT, DFFT);
+	print("for( int N = 2; N <= %i; N+=%i) {\n",  MAXFFT, DFFT);
 	indent();
 	print("if( !allow_real(N) ) {\n");
 	indent();
@@ -467,50 +467,7 @@ int main(int argc, char **argv) {
 			"\t\tdouble max;\n"
 			"\t\tfor (int ti = 0; ti < 256; ti++) {\n"
 			"\t\t\terr = 0.0;\n"
-			"\t\t\tstd::vector<std::complex<double>> X(N/2+1);\n"
-			"\t\t\tstd::vector<std::complex<double>> Y(N/2+1);\n"
-			"\t\t\tstd::vector<double> y(N);\n"
-			"\t\t\tstd::vector<double> x(N);\n"
-			"\t\t\tfor (int n = 0; n < N; n++) {\n"
-			"\t\t\t\tx[n] = rand1();\n"
-			"\t\t\t}\n"
-			"\t\t\ty = x;\n"
-			"\t\t\ttm1.start();\n"
-			"\t\t\ttm3.start();\n"
-			"\t\t\tFFT_real(X.data(), x.data(), N);\n"
-			"\t\t\ttm1.stop();\n"
-			"\t\t\ttm3.stop();\n"
-			"\t\t\ttm2.start();\n"
-			"\t\t\ttm4.start();\n"
-			"\t\t\tfftw_real(Y, y);\n"
-			"\t\t\ttm2.stop();\n"
-			"\t\t\ttm4.stop();\n"
-			"\t\t\tfor (int i = 0; i < X.size(); i++) {\n"
-			"\t\t\t\tY[i] -= X[i];\n"
-			"\t\t\t}\n"
-			"\t\t\tfor (int n = 0; n < N / 2 + 1; n++) {\n"
-			"\t\t\t\terr += std::abs(Y[n]) * std::abs(Y[n]);\n"
-			"\t\t\t\t//printf(\"%%i %%e %%e %%e %%e\\n\", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());\n"
-			"\t\t\t\tmax = std::max(max, std::abs(X[n]));\n"
-			"\t\t\t}\n"
-			"\t\t\terr = sqrt(err / N) / max;\n"
-			"\t\t}\n"
-			"\t\tprintf(\"%i %i %e %e %e %e %e %e %e\\n\", N, fft_nops_real[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());\n"
-			"");
-	deindent();
-	print("}\n");
-	print("for( int N = 2; N <= %i; N+=%i) {\n",  MAXFFT, DFFT);
-	indent();
-	print("if( !allow_real(N) ) {\n");
-	indent();
-	print("continue;\n");
-	deindent();
-	print("}\n");
-	print_notab("\t\ttimer tm1, tm2;\n"
-			"\t\tdouble err;\n"
-			"\t\tdouble max;\n"
-			"\t\tfor (int ti = 0; ti < 1; ti++) {\n"
-			"\t\t\terr = 0.0;\n"
+			"\t\t\tmax = 0.0;\n"
 			"\t\t\tstd::vector<std::complex<double>> X(N/2+1);\n"
 			"\t\t\tstd::vector<std::complex<double>> Y(N/2+1);\n"
 			"\t\t\tstd::vector<double> y(N);\n"
@@ -539,7 +496,52 @@ int main(int argc, char **argv) {
 			"\t\t\t}\n"
 			"\t\t\terr = sqrt(err / N) / max;\n"
 			"\t\t}\n"
-			"\t\tprintf(\"%i %i %e %e %e %e %e %e %e\\n\", N, fft_nops_real[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());\n"
+			"\t\tprintf(\"%4i %4i %e %e %e %e %e %e %e\\n\", N, fft_nops_real[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());\n"
+			"");
+	deindent();
+	print("}\n");
+	print("for( int N = 2; N <= %i; N+=%i) {\n", MAXFFT, DFFT);
+	indent();
+	print("if( !allow_real(N) ) {\n");
+	indent();
+	print("continue;\n");
+	deindent();
+	print("}\n");
+	print_notab("\t\ttimer tm1, tm2;\n"
+			"\t\tdouble err;\n"
+			"\t\tdouble max;\n"
+			"\t\tfor (int ti = 0; ti < 256; ti++) {\n"
+			"\t\t\terr = 0.0;\n"
+			"\t\t\tmax = 0.0;\n"
+			"\t\t\tstd::vector<std::complex<double>> X(N/2+1);\n"
+			"\t\t\tstd::vector<std::complex<double>> Y(N/2+1);\n"
+			"\t\t\tstd::vector<double> y(N);\n"
+			"\t\t\tstd::vector<double> x(N);\n"
+			"\t\t\tfor (int n = 0; n < N; n++) {\n"
+			"\t\t\t\tx[n] = rand1();\n"
+			"\t\t\t}\n"
+			"\t\t\ty = x;\n"
+			"\t\t\ttm1.start();\n"
+			"\t\t\ttm3.start();\n"
+			"\t\t\tFFT_real(X.data(), x.data(), N);\n"
+			"\t\t\ttm1.stop();\n"
+			"\t\t\ttm3.stop();\n"
+			"\t\t\ttm2.start();\n"
+			"\t\t\ttm4.start();\n"
+			"\t\t\tfftw_real(Y, y);\n"
+			"\t\t\ttm2.stop();\n"
+			"\t\t\ttm4.stop();\n"
+			"\t\t\tfor (int i = 0; i < X.size(); i++) {\n"
+			"\t\t\t\tY[i] -= X[i];\n"
+			"\t\t\t}\n"
+			"\t\t\tfor (int n = 0; n < N / 2 + 1; n++) {\n"
+			"\t\t\t\terr += std::abs(Y[n]) * std::abs(Y[n]);\n"
+			"\t\t\t\t//printf(\"%%i %%e %%e %%e %%e\\n\", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());\n"
+			"\t\t\t\tmax = std::max(max, std::abs(X[n]));\n"
+			"\t\t\t}\n"
+			"\t\t\terr = sqrt(err / N) / max;\n"
+			"\t\t}\n"
+			"\t\tprintf(\"%4i %4i %e %e %e %e %e %e %e\\n\", N, fft_nops_real[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());\n"
 			"");
 	deindent();
 	print("}\n");
@@ -554,13 +556,14 @@ int main(int argc, char **argv) {
 	print("test();\n");
 	print("printf(\"\\n\");\n");
 	print("test();\n");
-	deindent();
+	print("printf(\"EXITING\\n\");\n");
+deindent();
 	print("}\n\n");
 
 	set_file("Makefile");
 	print("CC=g++\n");
 //	print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -fsanitize=address -static-libasan -march=native\n");
-	print("CFLAGS=-I. -g -Ofast -march=native\n");
+	print("CFLAGS=-I. -Ofast -march=native\n");
 	print("DEPS = fft.hpp\n");
 	print("OBJ = fft.o ");
 	for (int n = 2; n <= MAXFFT; n += DFFT) {
