@@ -18,13 +18,13 @@ std::vector<int> fft_bitr_real(int N, int o, std::vector<int> indices, bool firs
 		return indices;
 	}
 	auto fftt = best_radix_real(N, o, first);
-//	if (fftt.type == RADIX) {
-	return fft_radix_bitr_real(fftt.N1, N, o, indices);
+	if (fftt.type == RADIX) {
+		return fft_radix_bitr_real(fftt.N1, N, o, indices);
 //	} else if (fftt.type == GOOD) {
 //		return gt2_fft_bitr(fftt.N1, fftt.N2, o, indices);
-//	} else {
-//		return indices;
-	//}
+	} else {
+		return indices;
+	}
 }
 
 std::vector<int> fft_radix_bitr_real(int r, int N, int o, std::vector<int> I) {
@@ -162,13 +162,27 @@ fft_type best_radix_real(int N, int o, bool first) {
 			}
 		}
 	}
+	if (N >= 7 && is_prime(N)) {
+		int raders_cnt = raders_fft_real_opcnt(N, 0);
+		if (raders_cnt < best_cnt) {
+			best_cnt = raders_cnt;
+			fftt.N1 = N;
+			fftt.type = RADERS;
+			fftt.nops = best_cnt;
+		}
+	}
 	return fftt;
 }
 
-void fft_real(int N, int o) {
-	if (N > 1) {
-		fft_type fftt = best_radix_real(N, o);
+void fft_real(int N, int o, bool first) {
+	if (N == 1) {
+		return;
+	}
+	auto fftt = best_radix_real(N, o, first);
+	if (fftt.type == RADIX) {
 		fft_radix_real(fftt.N1, N, o);
+	} else if (fftt.type == RADERS) {
+		raders_fft_real(fftt.N1, o);
 	}
 }
 
@@ -176,114 +190,20 @@ int fft_real_opcnt(int N, int o) {
 	fft_type fftt = best_radix_real(N, o);
 	return fft_radix_real_opcnt(fftt.N1, N, o);
 }
-int fft_radix_real_opcnt(int r, int N, int o) {
-	int cnt = 0;
-	if (N <= 1) {
-		return cnt;
-	}
-	for (int n = 0; n < r; n++) {
-		cnt += fft_real_opcnt(N / r, o + n * N / r);
-	}
-	for (int k = 0; k < N / r; k++) {
-		if (k > N / r / 2) {
-			continue;
-		}
-		std::vector<bool> zr_zero(r, false);
-		std::vector<bool> zi_zero(r, false);
-		if (k == 0 || (k == N / r / 2 && N / r % 2 == 0)) {
-			for (int i = 0; i < r; i++) {
-				const auto W = twiddle(i * k, N);
-				const int L = N / r;
-				const int M = L / 2;
-				const int oo = o + i * N / r;
-				const int iir = index_real(oo, k, 0, L);
-				const int iii = index_real(oo, k, 1, L);
-				if (i * k == 0) {
-					zi_zero[i] = true;
-				} else if (i * k == N / 4 && N % 4 == 0) {
-					cnt++;
-					zr_zero[i] = true;
-				} else if (i * k == N / 2 && N % 2 == 0) {
-					zi_zero[i] = true;
-					cnt++;
-				} else if (i * k == 3 * N / 4 && N % 4 == 0) {
-					zr_zero[i] = true;
-				} else {
-					cnt += 2;
-				}
-			}
-		} else {
-			const int M = N / 2;
-			for (int i = 0; i < r; i++) {
-				const auto W = twiddle(i * k, N);
-				const int L = N / r;
-				const int M = L / 2;
-				const int oo = o + i * N / r;
-				const int iir = index_real(oo, k, 0, L);
-				const int iii = index_real(oo, k, 1, L);
-				if (i * k == 0) {
-				} else if (i * k == N / 4 && N % 4 == 0) {
-					cnt++;
-				} else if (i * k == N / 2 && N % 2 == 0) {
-					cnt += 2;
-				} else if (i * k == 3 * N / 4 && N % 4 == 0) {
-					cnt += 1;
-				} else {
-					cnt += 4;
-				}
-			}
-		}
 
-		switch (r) {
-		case 2:
-			cnt += int(!(zr_zero[0] || zr_zero[1]));
-			if (N / 2 - k != k) {
-				cnt += int(!(zr_zero[0] || zr_zero[1]));
-			}
-			if (k != 0) {
-				cnt += int(!(zi_zero[0] || zi_zero[1]));
-				if (N / 2 - k != k) {
-					cnt += int(!zi_zero[0]);
-				}
-			}
-			break;
-		case 3:
-			cnt += int(!(zr_zero[1] || zr_zero[2]));
-			cnt += int(!(zi_zero[1] || zi_zero[2]));
-			cnt += 2;
-			cnt += 1 + int(!zr_zero[2]);
-			cnt += 1 + int(!zi_zero[2]);
-			const int k0 = k;
-			const int k1 = k <= N / 2 ? k + N / 3 : N - (k + N / 3);
-			const int k2 = N - (k + 2 * N / 3);
-			if (k1 != k2) {
-				cnt++;
-			}
-			if (k0 != 0 && !(k0 == N / 2 && N % 2 == 0)) {
-				cnt++;
-			}
-			if (k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
-				cnt++;
-			}
-			if (k1 != k2) {
-				if (k2 != 0 && !(k2 == N / 2 && N % 2 == 0)) {
-					cnt++;
-				}
-			}
-			break;
-		};
-	}
-	return cnt;
+int mod(int n, int N) {
+	return (n + N) % N;
 }
 
-void fft_radix_real(int r, int N, int o) {
+
+void fft_radix_real(int r, int N, int o, bool first) {
 	if (N < r) {
 		return;
 	}
 	print("{\n");
 	indent();
 	for (int n = 0; n < r; n++) {
-		fft_real(N / r, o + n * N / r);
+		fft_real(N / r, o + n * N / r, first);
 	}
 	for (int k = 0; k < N / r; k++) {
 		if (k > N / r / 2) {
@@ -437,7 +357,6 @@ void fft_radix_real(int r, int N, int o) {
 				bool ti2z = false;
 				bool ti3z = false;
 				if (rz[1] && rz[2]) {
-					print("constexpr double tr1 = 0;\n");
 					tr1z = true;
 				} else if (!rz[1] && rz[2]) {
 					print("const auto& tr1 = zr2;\n");
@@ -797,8 +716,6 @@ void fft_radix_real(int r, int N, int o) {
 			}
 			if (rz[2] && rz[3]) {
 				tr2z = tr4z = true;
-				print("constexpr auto tr2 = 0.0;\n");
-				print("constexpr auto tr4 = 0.0;\n");
 			} else if (!rz[2] && rz[3]) {
 				print("const auto& tr2 = zr2;\n");
 				print("const auto& tr4 = zr2;\n");
@@ -812,21 +729,18 @@ void fft_radix_real(int r, int N, int o) {
 			if (tr1z && tr2z) {
 				tr5z = true;
 				tr6z = true;
-				print("constexpr auto tr5 = 0.0;\n");
-				print("constexpr auto tr6 = 0.0;\n");
 			} else if (!tr1z && tr2z) {
 				print("const auto& tr5 = tr1;\n");
 				print("const auto tr6 = (%24.17e) * tr1;\n", sqrt(5) * 0.25);
 			} else if (tr2z && !tr1z) {
 				print("const auto& tr5 = tr2;\n");
-				print("const auto tr6 = (%24.17e) * -tr2;\n", -sqrt(5) * 0.25);
+				print("const auto tr6 = (%24.17e) * tr2;\n", sqrt(5) * 0.25);
 			} else {
 				print("const auto tr5 = tr1 + tr2;\n");
 				print("const auto tr6 = (%24.17e) * (tr1 - tr2);\n", sqrt(5) * 0.25);
 			}
 			if (rz[0] && tr5z) {
 				tr7z = true;
-				print("constexpr auto tr7 = 0.0;\n");
 			} else if (!rz[0] && tr5z) {
 				print("const auto& tr7 = zr0;\n");
 			} else if (rz[0] && !tr5z) {
@@ -837,8 +751,6 @@ void fft_radix_real(int r, int N, int o) {
 			if (tr6z && tr7z) {
 				tr8z = true;
 				tr9z = true;
-				print("constexpr auto tr8 = 0.0;\n");
-				print("constexpr auto tr9 = 0.0;\n");
 			} else if (tr6z && !tr7z) {
 				print("const auto& tr8 = tr7;\n");
 				print("const auto& tr9 = tr7;\n");
@@ -851,8 +763,6 @@ void fft_radix_real(int r, int N, int o) {
 			}
 			if (tr3z && tr4z) {
 				tr10z = tr11z = true;
-				print("constexpr auto tr10 = 0.0;\n");
-				print("constexpr auto tr11 = 0.0;\n");
 			} else if (!tr3z && tr4z) {
 				print("const auto tr10 = (%24.17e) * tr3;\n", sin(2.0 * M_PI / 5.0));
 				print("const auto tr11 = (%24.17e) * tr3;\n", sin(2.0 * M_PI / 10.0));
@@ -878,8 +788,6 @@ void fft_radix_real(int r, int N, int o) {
 			}
 			if (iz[2] && iz[3]) {
 				ti2z = ti4z = true;
-				print("constexpr auto ti2 = 0.0;\n");
-				print("constexpr auto ti4 = 0.0;\n");
 			} else if (!iz[2] && iz[3]) {
 				print("const auto& ti2 = zi2;\n");
 				print("const auto& ti4 = zi2;\n");
@@ -893,8 +801,6 @@ void fft_radix_real(int r, int N, int o) {
 			if (ti1z && ti2z) {
 				ti5z = true;
 				ti6z = true;
-				print("constexpr auto ti5 = 0.0;\n");
-				print("constexpr auto ti6 = 0.0;\n");
 			} else if (!ti1z && ti2z) {
 				print("const auto& ti5 = ti1;\n");
 				print("const auto ti6 = (%24.17e) * ti1;\n", sqrt(5) * 0.25);
@@ -907,7 +813,6 @@ void fft_radix_real(int r, int N, int o) {
 			}
 			if (iz[0] && ti5z) {
 				ti7z = true;
-				print("constexpr auto ti7 = 0.0;\n");
 			} else if (!iz[0] && ti5z) {
 				print("const auto& ti7 = zi0;\n");
 			} else if (iz[0] && !ti5z) {
@@ -918,8 +823,6 @@ void fft_radix_real(int r, int N, int o) {
 			if (ti6z && ti7z) {
 				ti8z = true;
 				ti9z = true;
-				print("constexpr auto ti8 = 0.0;\n");
-				print("constexpr auto ti9 = 0.0;\n");
 			} else if (ti6z && !ti7z) {
 				print("const auto& ti8 = ti7;\n");
 				print("const auto& ti9 = ti7;\n");
@@ -932,8 +835,6 @@ void fft_radix_real(int r, int N, int o) {
 			}
 			if (ti3z && ti4z) {
 				ti10z = ti11z = true;
-				print("constexpr auto ti10 = 0.0;\n");
-				print("constexpr auto ti11 = 0.0;\n");
 			} else if (!ti3z && ti4z) {
 				print("const auto ti10 = (%24.17e) * ti3;\n", sin(2.0 * M_PI / 5.0));
 				print("const auto ti11 = (%24.17e) * ti3;\n", sin(2.0 * M_PI / 10.0));
@@ -1422,7 +1323,7 @@ void fft_radix_real(int r, int N, int o) {
 				}
 				if (used.find(k3) == used.end() && k3 != 0 && !(k3 == N / 2 && N % 2 == 0)) {
 					used.insert(k3);
-					print("x[%i] = -ti7 + ti10;\n", index_real(o, k3, 1, N));
+					print("x[%i] = ti10 - ti7;\n", index_real(o, k3, 1, N));
 				}
 			}
 
@@ -1700,4 +1601,1197 @@ void fft_radix_real(int r, int N, int o) {
 	deindent();
 	print("}\n");
 
+}
+
+int fft_radix_real_opcnt(int r, int N, int o) {
+	int cnt = 0;
+	if (N < r) {
+		return cnt;
+	}
+	if (N > r) {
+		for (int n = 0; n < r; n++) {
+			cnt += fft_real_opcnt(N / r, o + n * N / r);
+		}
+	}
+	for (int k = 0; k < N / r; k++) {
+		if (k > N / r / 2) {
+			continue;
+		}
+		std::vector<bool> rz(r, false);
+		std::vector<bool> iz(r, false);
+		if (k == 0 || (k == N / r / 2 && N / r % 2 == 0)) {
+			for (int i = 0; i < r; i++) {
+				const auto W = twiddle(i * k, N);
+				const int L = N / r;
+				const int M = L / 2;
+				const int oo = o + i * N / r;
+				const int iir = index_real(oo, k, 0, L);
+				const int iii = index_real(oo, k, 1, L);
+				if (i * k == 0) {
+					iz[i] = true;
+				} else if (i * k == N / 4 && N % 4 == 0) {
+					cnt++;
+					rz[i] = true;
+				} else if (i * k == N / 2 && N % 2 == 0) {
+					cnt++;
+					iz[i] = true;
+				} else if (i * k == 3 * N / 4 && N % 4 == 0) {
+					rz[i] = true;
+				} else {
+					cnt += 2;
+				}
+			}
+		} else {
+			const int M = N / 2;
+			for (int i = 0; i < r; i++) {
+				const auto W = twiddle(i * k, N);
+				const int L = N / r;
+				const int M = L / 2;
+				const int oo = o + i * N / r;
+				const int iir = index_real(oo, k, 0, L);
+				const int iii = index_real(oo, k, 1, L);
+				if (i * k == 0) {
+				} else if (i * k == N / 4 && N % 4 == 0) {
+					cnt++;
+				} else if (i * k == N / 2 && N % 2 == 0) {
+					cnt += 2;
+				} else if (i * k == 3 * N / 4 && N % 4 == 0) {
+					cnt++;
+				} else {
+					cnt += 4;
+				}
+			}
+		}
+
+		switch (r) {
+		case 2: {
+			std::unordered_set<int> used;
+			int k0 = k;
+			int k1 = N / 2 - k;
+			if (used.find(k0) == used.end()) {
+				used.insert(k0);
+				if (rz[0] && rz[1]) {
+				} else if (rz[0] && !rz[1]) {
+				} else if (!rz[0] && rz[1]) {
+				} else if (!rz[0] && !rz[1]) {
+					cnt++;
+				}
+			}
+			if (used.find(k1) == used.end()) {
+				used.insert(k1);
+				if (rz[0] && rz[1]) {
+				} else if (rz[0] && !rz[1]) {
+					cnt++;
+				} else if (!rz[0] && rz[1]) {
+				} else if (!rz[0] && !rz[1]) {
+					cnt++;
+				}
+			}
+			used.clear();
+			if (k0 != 0 && !(k0 == N / 2 && N % 2 == 0)) {
+				if (used.find(k0) == used.end()) {
+					used.insert(k0);
+					if (iz[0] && iz[1]) {
+					} else if (!iz[0] && iz[1]) {
+					} else if (!iz[0] && !iz[1]) {
+						cnt++;
+					}
+				}
+			}
+			if (k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+					if (iz[0] && iz[1]) {
+					} else if (!iz[0] && iz[1]) {
+						cnt++;
+					} else if (iz[0] && iz[1]) {
+					} else if (!iz[0] && !iz[1]) {
+						cnt++;
+					}
+				}
+			}
+		}
+			break;
+		case 3: {
+			bool tr1z = false;
+			bool tr2z = false;
+			bool tr3z = false;
+			bool ti1z = false;
+			bool ti2z = false;
+			bool ti3z = false;
+			if (rz[1] && rz[2]) {
+				tr1z = true;
+			} else if (!rz[1] && rz[2]) {
+			} else if (rz[1] && !rz[2]) {
+			} else {
+				cnt++;
+			}
+			if (tr1z && rz[0]) {
+				tr2z = true;
+			} else if (tr1z && !rz[0]) {
+			} else if (!tr1z && rz[0]) {
+				cnt++;
+			} else {
+				cnt++;
+			}
+			if (rz[1] && rz[2]) {
+				tr3z = true;
+			} else if (!rz[1] && rz[2]) {
+				cnt++;
+			} else if (rz[1] && !rz[2]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (iz[1] && iz[2]) {
+				ti1z = true;
+			} else if (!iz[1] && iz[2]) {
+			} else if (iz[1] && !iz[2]) {
+			} else {
+				cnt++;
+			}
+			if (ti1z && iz[0]) {
+				ti2z = true;
+			} else if (ti1z && !iz[0]) {
+			} else if (!ti1z && iz[0]) {
+				cnt++;
+			} else {
+				cnt++;
+			}
+			if (iz[1] && iz[2]) {
+				ti3z = true;
+			} else if (!iz[1] && iz[2]) {
+				cnt++;
+			} else if (iz[1] && !iz[2]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			const int k0 = k;
+			const int k1 = k <= N / 2 ? k + N / 3 : N - (k + N / 3);
+			const int k2 = N - (k + 2 * N / 3);
+			std::unordered_set<int> used;
+			if (used.find(k0) == used.end()) {
+				used.insert(k0);
+				if (rz[0] && tr1z) {
+				} else if (!rz[0] && tr1z) {
+				} else if (rz[0] && !tr1z) {
+				} else {
+					cnt++;
+				}
+			}
+			if (used.find(k1) == used.end()) {
+				used.insert(k1);
+				if (tr2z && ti3z) {
+				} else if (!tr2z && ti3z) {
+				} else if (tr2z && !ti3z) {
+				} else {
+					cnt++;
+				}
+			}
+			if (used.find(k2) == used.end()) {
+				used.insert(k2);
+				if (tr2z && ti3z) {
+				} else if (!tr2z && ti3z) {
+				} else if (tr2z && !ti3z) {
+					cnt++;
+				} else {
+					cnt++;
+				}
+			}
+			used.clear();
+			if (k0 != 0 && !(k0 == N / 2 && N % 2 == 0)) {
+				if (used.find(k0) == used.end()) {
+					used.insert(k0);
+					if (iz[0] && ti1z) {
+					} else if (!iz[0] && ti1z) {
+					} else if (iz[0] && !ti1z) {
+					} else {
+						cnt++;
+					}
+				}
+			}
+			if (k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+					if (ti2z && tr3z) {
+					} else if (!ti2z && tr3z) {
+					} else if (ti2z && !tr3z) {
+						cnt++;
+					} else {
+						cnt++;
+					}
+				}
+			}
+			if (k2 != 0 && !(k2 == N / 2 && N % 2 == 0)) {
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+					if (ti2z && ti3z) {
+					} else if (!ti2z && ti3z) {
+						cnt++;
+					} else if (ti2z && !ti3z) {
+						cnt++;
+					} else {
+						cnt += 2;
+					}
+				}
+			}
+		}
+			break;
+		case 4: {
+			const int k0 = k;
+			const int k1 = k + N / 4;
+			const int k2 = N - (k + 2 * N / 4);
+			const int k3 = N - (k + 3 * N / 4);
+			bool tr1z = false;
+			bool tr2z = false;
+			bool tr3z = false;
+			bool tr4z = false;
+			bool ti1z = false;
+			bool ti2z = false;
+			bool ti3z = false;
+			bool ti4z = false;
+
+			if (rz[0] && rz[2]) {
+				tr1z = true;
+				tr3z = true;
+			} else if (!rz[0] && rz[2]) {
+			} else if (rz[0] && !rz[2]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (rz[1] && rz[3]) {
+				tr2z = true;
+				tr4z = true;
+			} else if (!rz[1] && rz[3]) {
+			} else if (rz[1] && !rz[3]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (iz[0] && iz[2]) {
+				ti1z = true;
+				ti3z = true;
+			} else if (!iz[0] && iz[2]) {
+			} else if (iz[0] && !iz[2]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (iz[1] && iz[3]) {
+				ti2z = true;
+				ti4z = true;
+			} else if (!iz[1] && iz[3]) {
+			} else if (iz[1] && !iz[3]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			std::unordered_set<int> used;
+			if (tr1z && tr2z) {
+			} else if (!tr1z && tr2z) {
+				if (used.find(k0) == used.end()) {
+					used.insert(k0);
+				}
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+				}
+			} else if (tr1z && !tr2z) {
+				if (used.find(k0) == used.end()) {
+					used.insert(k0);
+				}
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+					cnt++;
+				}
+			} else {
+				if (used.find(k0) == used.end()) {
+					used.insert(k0);
+					cnt++;
+				}
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+					cnt++;
+				}
+			}
+
+			if (tr3z && ti4z) {
+			} else if (!tr3z && ti4z) {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+				}
+			} else if (tr3z && !ti4z) {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+					cnt++;
+				}
+			} else {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+					cnt++;
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+					cnt++;
+				}
+			}
+			used.clear();
+			if (ti1z && ti2z) {
+			} else if (!ti1z && ti2z) {
+				if (used.find(k0) == used.end() && k0 != N - k0 && k0 != 0) {
+					used.insert(k0);
+				}
+				if (used.find(k2) == used.end() && k2 != N - k2 && k2 != 0) {
+					cnt++;
+					used.insert(k2);
+				}
+			} else if (ti1z && !ti2z) {
+				if (used.find(k0) == used.end() && k0 != N - k0 && k0 != 0) {
+					used.insert(k0);
+				}
+				if (used.find(k2) == used.end() && k2 != N - k2 && k2 != 0) {
+					used.insert(k2);
+				}
+			} else {
+				if (used.find(k0) == used.end() && k0 != N - k0 && k0 != 0) {
+					cnt++;
+					used.insert(k0);
+				}
+				if (used.find(k2) == used.end() && k2 != N - k2 && k2 != 0) {
+					cnt += 2;
+					used.insert(k2);
+				}
+			}
+			if (ti3z && tr4z) {
+			} else if (!ti3z && tr4z) {
+				if (used.find(k1) == used.end() && k1 != N - k1 && k1 != 0) {
+					used.insert(k1);
+				}
+				if (used.find(k3) == used.end() && k3 != N - k3 && k3 != 0) {
+					cnt++;
+					used.insert(k3);
+				}
+			} else if (ti3z && !tr4z) {
+				if (used.find(k1) == used.end() && k1 != N - k1 && k1 != 0) {
+					cnt++;
+					used.insert(k1);
+				}
+				if (used.find(k3) == used.end() && k3 != N - k3 && k3 != 0) {
+					cnt++;
+					used.insert(k3);
+				}
+			} else {
+				if (used.find(k1) == used.end() && k1 != N - k1 && k1 != 0) {
+					cnt++;
+					used.insert(k1);
+				}
+				if (used.find(k3) == used.end() && k3 != N - k3 && k3 != 0) {
+					cnt += 2;
+					used.insert(k3);
+				}
+			}
+		}
+			break;
+		case 5: {
+			// Radix -- 5
+			bool tr1z = false;
+			bool tr2z = false;
+			bool tr3z = false;
+			bool tr4z = false;
+			bool tr5z = false;
+			bool tr6z = false;
+			bool tr7z = false;
+			bool tr8z = false;
+			bool tr9z = false;
+			bool tr10z = false;
+			bool tr11z = false;
+			bool ti1z = false;
+			bool ti2z = false;
+			bool ti3z = false;
+			bool ti4z = false;
+			bool ti5z = false;
+			bool ti6z = false;
+			bool ti7z = false;
+			bool ti8z = false;
+			bool ti9z = false;
+			bool ti10z = false;
+			bool ti11z = false;
+			if (rz[1] && rz[4]) {
+				tr1z = tr3z = true;
+			} else if (!rz[1] && rz[4]) {
+			} else if (rz[1] && !rz[4]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (rz[2] && rz[3]) {
+				tr2z = tr4z = true;
+			} else if (!rz[2] && rz[3]) {
+			} else if (rz[2] && !rz[3]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (tr1z && tr2z) {
+				tr5z = true;
+				tr6z = true;
+			} else if (!tr1z && tr2z) {
+				cnt++;
+			} else if (tr2z && !tr1z) {
+				cnt++;
+			} else {
+				cnt += 3;
+			}
+			if (rz[0] && tr5z) {
+				tr7z = true;
+			} else if (!rz[0] && tr5z) {
+			} else if (rz[0] && !tr5z) {
+				cnt++;
+			} else {
+				cnt++;
+			}
+			if (tr6z && tr7z) {
+				tr8z = true;
+				tr9z = true;
+			} else if (tr6z && !tr7z) {
+			} else if (!tr6z && tr7z) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (tr3z && tr4z) {
+				tr10z = tr11z = true;
+			} else if (!tr3z && tr4z) {
+				cnt += 2;
+			} else if (tr3z && !tr4z) {
+				cnt += 2;
+			} else {
+				cnt += 4;
+			}
+
+			if (iz[1] && iz[4]) {
+				ti1z = ti3z = true;
+			} else if (!iz[1] && iz[4]) {
+			} else if (iz[1] && !iz[4]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (iz[2] && iz[3]) {
+				ti2z = ti4z = true;
+			} else if (!iz[2] && iz[3]) {
+			} else if (iz[2] && !iz[3]) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (ti1z && ti2z) {
+				ti5z = true;
+				ti6z = true;
+			} else if (!ti1z && ti2z) {
+				cnt++;
+			} else if (ti2z && !ti1z) {
+				cnt++;
+			} else {
+				cnt += 3;
+			}
+			if (iz[0] && ti5z) {
+				ti7z = true;
+			} else if (!iz[0] && ti5z) {
+			} else if (iz[0] && !ti5z) {
+				cnt++;
+			} else {
+				cnt++;
+			}
+			if (ti6z && ti7z) {
+				ti8z = true;
+				ti9z = true;
+			} else if (ti6z && !ti7z) {
+			} else if (!ti6z && ti7z) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+			if (ti3z && ti4z) {
+				ti10z = ti11z = true;
+			} else if (!ti3z && ti4z) {
+				cnt += 2;
+			} else if (ti3z && !ti4z) {
+				cnt += 2;
+			} else {
+				cnt += 4;
+			}
+			int k0 = k;
+			int k1 = k + N / 5;
+			int k2 = k + 2 * N / 5;
+			int k3 = N - (k + 3 * N / 5);
+			int k4 = N - (k + 4 * N / 5);
+			if (k > N / 2) {
+				k2 = N - k2;
+			}
+			std::unordered_set<int> used;
+			if (used.find(k0) == used.end()) {
+				used.insert(k0);
+				if (rz[0] && tr5z) {
+				} else if (!rz[0] && tr5z) {
+				} else if (rz[0] && !tr5z) {
+				} else {
+					cnt++;
+				}
+			}
+			if (tr8z && ti10z) {
+			} else if (!tr8z && ti10z) {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+				}
+				if (used.find(k4) == used.end()) {
+					used.insert(k4);
+				}
+			} else if (tr8z && !ti10z) {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+				}
+				if (used.find(k4) == used.end()) {
+					used.insert(k4);
+					cnt++;
+				}
+			} else {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+					cnt++;
+				}
+				if (used.find(k4) == used.end()) {
+					used.insert(k4);
+					cnt++;
+				}
+			}
+			if (tr9z && ti11z) {
+			} else if (!tr9z && ti11z) {
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+				}
+			} else if (tr9z && !ti11z) {
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+					cnt++;
+				}
+			} else {
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+					cnt++;
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+					cnt++;
+				}
+			}
+
+			used.clear();
+			if (used.find(k0) == used.end() && k0 != 0 && !(k0 == N / 2 && N % 2 == 0)) {
+				used.insert(k0);
+				if (iz[0] && ti5z) {
+				} else if (!iz[0] && ti5z) {
+				} else if (iz[0] && !ti5z) {
+				} else {
+					cnt++;
+				}
+			}
+			if (ti8z && tr10z) {
+			} else if (!ti8z && tr10z) {
+				if (used.find(k1) == used.end() && k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
+					used.insert(k1);
+					cnt++;
+				}
+			} else if (ti8z && !tr10z) {
+				if (used.find(k1) == used.end() && k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
+					used.insert(k1);
+					cnt += 2;
+				}
+			} else {
+				if (used.find(k1) == used.end() && k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
+					used.insert(k1);
+					cnt += 3;
+				}
+			}
+			if (ti9z && tr11z) {
+			} else if (!ti9z && tr11z) {
+				if (used.find(k2) == used.end() && k2 != 0 && !(k2 == N / 2 && N % 2 == 0)) {
+					used.insert(k2);
+				}
+				if (used.find(k3) == used.end() && k3 != 0 && !(k3 == N / 2 && N % 2 == 0)) {
+					used.insert(k3);
+					cnt++;
+				}
+			} else if (ti9z && !tr11z) {
+				if (used.find(k2) == used.end() && k2 != 0 && !(k2 == N / 2 && N % 2 == 0)) {
+					used.insert(k2);
+					cnt++;
+				}
+				if (used.find(k3) == used.end() && k3 != 0 && !(k3 == N / 2 && N % 2 == 0)) {
+					used.insert(k3);
+					cnt++;
+				}
+			} else {
+				if (used.find(k2) == used.end() && k2 != 0 && !(k2 == N / 2 && N % 2 == 0)) {
+					used.insert(k2);
+					cnt++;
+				}
+				if (used.find(k3) == used.end() && k3 != 0 && !(k3 == N / 2 && N % 2 == 0)) {
+					used.insert(k3);
+					cnt += 2;
+				}
+			}
+		}
+			break;
+		case 6: {
+			bool tr1z = false;
+			bool tr2z = false;
+			bool tr3z = false;
+			bool tr4z = false;
+			bool tr5z = false;
+			bool tr6z = false;
+			bool tr7z = false;
+			bool tr8z = false;
+			bool tr9z = false;
+			bool tr10z = false;
+			bool tr11z = false;
+			bool tr12z = false;
+			bool ti1z = false;
+			bool ti2z = false;
+			bool ti3z = false;
+			bool ti4z = false;
+			bool ti5z = false;
+			bool ti6z = false;
+			bool ti7z = false;
+			bool ti8z = false;
+			bool ti9z = false;
+			bool ti10z = false;
+			bool ti11z = false;
+			bool ti12z = false;
+
+			if (rz[2] && rz[4]) {
+				tr1z = true;
+				tr3z = true;
+			} else if (!rz[2] && rz[4]) {
+				cnt++;
+			} else if (rz[2] && !rz[4]) {
+				cnt++;
+			} else {
+				cnt += 3;
+			}
+			if (tr1z && rz[0]) {
+				tr2z = true;
+			} else if (!tr1z && rz[0]) {
+				cnt++;
+			} else if (tr1z && !rz[0]) {
+			} else {
+				cnt++;
+			}
+			if (rz[1] && rz[5]) {
+				tr4z = true;
+				tr6z = true;
+			} else if (!rz[1] && rz[5]) {
+				cnt++;
+			} else if (rz[1] && !rz[5]) {
+				cnt++;
+			} else {
+				cnt += 3;
+			}
+			if (tr4z && rz[3]) {
+				tr5z = true;
+			} else if (!tr4z && rz[3]) {
+				cnt++;
+			} else if (tr4z && !rz[3]) {
+			} else {
+				cnt++;
+			}
+
+			if (iz[2] && iz[4]) {
+				ti1z = true;
+				ti3z = true;
+			} else if (!iz[2] && iz[4]) {
+				cnt++;
+			} else if (iz[2] && !iz[4]) {
+				cnt++;
+			} else {
+				cnt += 3;
+			}
+			if (ti1z && iz[0]) {
+				ti2z = true;
+			} else if (!ti1z && iz[0]) {
+				cnt++;
+			} else if (ti1z && !iz[0]) {
+			} else {
+				cnt++;
+			}
+			if (iz[1] && iz[5]) {
+				ti4z = true;
+				ti6z = true;
+			} else if (!iz[1] && iz[5]) {
+				cnt++;
+			} else if (iz[1] && !iz[5]) {
+				cnt++;
+			} else {
+				cnt += 3;
+			}
+			if (ti4z && iz[3]) {
+				ti5z = true;
+			} else if (!ti4z && iz[3]) {
+				cnt++;
+			} else if (tr4z && !rz[3]) {
+			} else {
+				cnt++;
+			}
+
+			if (rz[0] && tr1z) {
+				tr7z = true;
+			} else if (!rz[0] && tr1z) {
+			} else if (rz[0] && !tr1z) {
+			} else {
+				cnt++;
+			}
+
+			if (iz[0] && ti1z) {
+				ti7z = true;
+			} else if (!iz[0] && ti1z) {
+			} else if (iz[0] && !ti1z) {
+			} else {
+				cnt++;
+			}
+
+			if (tr2z && ti3z) {
+				tr8z = true;
+				tr9z = true;
+			} else if (!tr2z && ti3z) {
+			} else if (tr2z && !ti3z) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+
+			if (ti2z && tr3z) {
+				ti2z = true;
+				tr3z = true;
+			} else if (!ti2z && tr3z) {
+			} else if (ti2z && !tr3z) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+
+			if (rz[3] && tr4z) {
+				tr10z = true;
+			} else if (rz[3] && !tr4z) {
+			} else if (!rz[3] && tr4z) {
+			} else {
+				cnt++;
+			}
+
+			if (iz[3] && ti4z) {
+				ti4z = true;
+			} else if (iz[3] && !ti4z) {
+			} else if (!iz[3] && ti4z) {
+			} else {
+				cnt++;
+			}
+
+			if (tr5z && ti6z) {
+				tr5z = true;
+				ti6z = true;
+			} else if (!tr5z && ti6z) {
+			} else if (tr5z && !ti6z) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+
+			if (ti5z && tr6z) {
+				ti5z = true;
+				tr6z = true;
+			} else if (!ti5z && tr6z) {
+			} else if (ti5z && !tr6z) {
+				cnt++;
+			} else {
+				cnt += 2;
+			}
+
+			int k0 = k + 0 * N / 6;
+			int k1 = k + 1 * N / 6;
+			int k2 = k + 2 * N / 6;
+			int k3 = N - (k + 3 * N / 6);
+			int k4 = N - (k + 4 * N / 6);
+			int k5 = N - (k + 5 * N / 6);
+			std::unordered_set<int> used;
+			if (tr7z && tr10z) {
+			} else if (!tr7z && tr10z) {
+				if (used.find(k0) == used.end()) {
+					used.insert(k0);
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+				}
+			} else if (tr7z && !tr10z) {
+				if (used.find(k0) == used.end()) {
+					used.insert(k0);
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+					cnt++;
+				}
+			} else {
+				if (used.find(k0) == used.end()) {
+					used.insert(k0);
+					cnt++;
+				}
+				if (used.find(k3) == used.end()) {
+					used.insert(k3);
+					cnt++;
+				}
+			}
+			if (tr8z && tr11z) {
+
+			} else if (!tr8z && tr11z) {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+				}
+				if (used.find(k4) == used.end()) {
+					used.insert(k4);
+				}
+			} else if (tr8z && !tr11z) {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+					cnt++;
+				}
+				if (used.find(k4) == used.end()) {
+					used.insert(k4);
+				}
+			} else {
+				if (used.find(k1) == used.end()) {
+					used.insert(k1);
+					cnt++;
+				}
+				if (used.find(k4) == used.end()) {
+					used.insert(k4);
+					cnt++;
+				}
+			}
+			if (tr9z && tr12z) {
+			} else if (tr9z && !tr12z) {
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+				}
+				if (used.find(k5) == used.end()) {
+					used.insert(k5);
+					cnt++;
+				}
+			} else if (!tr9z && tr12z) {
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+				}
+				if (used.find(k5) == used.end()) {
+					used.insert(k5);
+				}
+			} else {
+				if (used.find(k2) == used.end()) {
+					used.insert(k2);
+					cnt++;
+				}
+				if (used.find(k5) == used.end()) {
+					used.insert(k5);
+					cnt++;
+				}
+			}
+			used.clear();
+
+			if (ti7z && ti10z) {
+			} else if (!ti7z && ti10z) {
+				if (used.find(k0) == used.end() && k0 != 0 && !(k0 == N / 2 && N % 2 == 0)) {
+					used.insert(k0);
+				}
+				if (used.find(k3) == used.end() && k3 != 0 && !(k3 == N / 2 && N % 2 == 0)) {
+					used.insert(k3);
+					cnt++;
+				}
+			} else if (ti7z && !ti10z) {
+				if (used.find(k0) == used.end() && k0 != 0 && !(k0 == N / 2 && N % 2 == 0)) {
+					used.insert(k0);
+				}
+				if (used.find(k3) == used.end() && k3 != 0 && !(k3 == N / 2 && N % 2 == 0)) {
+					used.insert(k3);
+				}
+			} else {
+				if (used.find(k0) == used.end() && k0 != 0 && !(k0 == N / 2 && N % 2 == 0)) {
+					used.insert(k0);
+					cnt++;
+				}
+				if (used.find(k3) == used.end() && k3 != 0 && !(k3 == N / 2 && N % 2 == 0)) {
+					used.insert(k3);
+					cnt++;
+				}
+			}
+
+			if (ti8z && ti11z) {
+
+			} else if (!ti8z && ti11z) {
+				if (used.find(k1) == used.end() && k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
+					used.insert(k1);
+				}
+				if (used.find(k4) == used.end() && k4 != 0 && !(k4 == N / 2 && N % 2 == 0)) {
+					used.insert(k4);
+					cnt++;
+
+				} else if (ti8z && !ti11z) {
+					if (used.find(k1) == used.end() && k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
+						used.insert(k1);
+						cnt++;
+					}
+					if (used.find(k4) == used.end() && k4 != 0 && !(k4 == N / 2 && N % 2 == 0)) {
+						used.insert(k4);
+						cnt++;
+					}
+				} else {
+					if (used.find(k1) == used.end() && k1 != 0 && !(k1 == N / 2 && N % 2 == 0)) {
+						used.insert(k1);
+						cnt++;
+					}
+					if (used.find(k4) == used.end() && k4 != 0 && !(k4 == N / 2 && N % 2 == 0)) {
+						used.insert(k4);
+						cnt += 2;
+					}
+				}
+				if (ti9z && ti12z) {
+				} else if (!ti9z && ti12z) {
+					if (used.find(k2) == used.end() && k2 != 0 && !(k2 == N / 2 && N % 2 == 0)) {
+						used.insert(k2);
+					}
+					if (used.find(k5) == used.end() && k5 != 0 && !(k5 == N / 2 && N % 2 == 0)) {
+						used.insert(k5);
+						cnt++;
+					}
+				} else if (ti9z && !ti12z) {
+					if (used.find(k2) == used.end() && k2 != 0 && !(k2 == N / 2 && N % 2 == 0)) {
+						used.insert(k2);
+					}
+					if (used.find(k5) == used.end() && k5 != 0 && !(k5 == N / 2 && N % 2 == 0)) {
+						used.insert(k5);
+					}
+				} else {
+					if (used.find(k2) == used.end() && k2 != 0 && !(k2 == N / 2 && N % 2 == 0)) {
+						used.insert(k2);
+						cnt++;
+					}
+					if (used.find(k5) == used.end() && k5 != 0 && !(k5 == N / 2 && N % 2 == 0)) {
+						used.insert(k5);
+						cnt++;
+					}
+				}
+			}
+		}
+			break;
+		default: {
+			std::vector<bool> txpz((r - 1) / 2 + 1, false);
+			std::vector<bool> txmz((r - 1) / 2 + 1, false);
+			std::vector<bool> typz((r - 1) / 2 + 1, false);
+			std::vector<bool> tymz((r - 1) / 2 + 1, false);
+			for (int j = 1; j <= (r - 1) / 2; j++) {
+				if (rz[j] && rz[r - j]) {
+					txpz[j] = true;
+				} else if (!rz[j] && rz[r - j]) {
+				} else if (rz[j] && !rz[r - j]) {
+				} else {
+					cnt++;
+				}
+			}
+			for (int j = 1; j <= (r - 1) / 2; j++) {
+				if (rz[j] && rz[r - j]) {
+					txmz[j] = true;
+				} else if (!rz[j] && rz[r - j]) {
+				} else if (rz[j] && !rz[r - j]) {
+					cnt++;
+				} else {
+					cnt++;
+				}
+			}
+			for (int j = 1; j <= (r - 1) / 2; j++) {
+				if (iz[j] && iz[r - j]) {
+					typz[j] = true;
+				} else if (!iz[j] && iz[r - j]) {
+				} else if (iz[j] && !iz[r - j]) {
+				} else {
+					cnt++;
+				}
+			}
+			for (int j = 1; j <= (r - 1) / 2; j++) {
+				if (iz[j] && iz[r - j]) {
+					tymz[j] = true;
+				} else if (!iz[j] && iz[r - j]) {
+				} else if (iz[j] && !iz[r - j]) {
+					cnt++;
+				} else {
+					cnt++;
+				}
+			}
+			std::vector<bool> apz((r - 1) / 2 + 1, true);
+			std::vector<bool> amz((r - 1) / 2 + 1, true);
+			std::vector<bool> bpz((r - 1) / 2 + 1, true);
+			std::vector<bool> bmz((r - 1) / 2 + 1, true);
+			for (int i = 1; i <= (r - 1) / 2; i++) {
+				bool apfirst = true;
+				bool amfirst = true;
+				bool bpfirst = true;
+				bool bmfirst = true;
+
+				for (int j = 1; j <= (r - 1) / 2; j++) {
+					if (!txpz[j]) {
+						apz[i] = false;
+						if (apfirst) {
+							apfirst = false;
+							cnt++;
+						} else {
+							cnt++;
+						}
+					}
+					if (!typz[j]) {
+						bpz[i] = false;
+						if (bpfirst) {
+							bpfirst = false;
+							cnt++;
+						} else {
+							cnt++;
+						}
+					}
+					if (!tymz[j]) {
+						amz[i] = false;
+						if (amfirst) {
+							cnt++;
+							amfirst = false;
+						} else {
+							cnt++;
+						}
+					}
+					if (!txmz[j]) {
+						bmz[i] = false;
+						if (bmfirst) {
+							cnt++;
+							bmfirst = false;
+						} else {
+							cnt++;
+						}
+					}
+				}
+				if (!rz[0]) {
+					apz[i] = false;
+					if (apfirst) {
+						apfirst = false;
+					} else {
+						cnt++;
+					}
+				}
+				if (!iz[0]) {
+					bpz[i] = false;
+					if (bpfirst) {
+						bpfirst = false;
+					} else {
+						cnt++;
+					}
+				}
+			}
+			std::unordered_set<int> used;
+			if (used.find(k) == used.end()) {
+				used.insert(k);
+
+				for (int i = 0; i < r; i++) {
+					if (!rz[i]) {
+						cnt++;
+					}
+				}
+
+			}
+			for (int i = 1; i <= (r - 1) / 2; i++) {
+				const int ka = k + i * N / r;
+				const int rk0 = index_real(o, ka, 0, N);
+				if (used.find(ka) == used.end()) {
+					used.insert(ka);
+					if (apz[i] && amz[i]) {
+					} else if (apz[i] && !amz[i]) {
+					} else if (!apz[i] && amz[i]) {
+					} else {
+						cnt++;
+					}
+				}
+			}
+			if (!(k == N / r / 2 && N % 2 == 0)) {
+				for (int i = 1; i <= (r - 1) / 2; i++) {
+					const int kb = N - (k + (r - i) * N / r);
+					const int rk1 = index_real(o, kb, 0, N);
+					if (used.find(kb) == used.end()) {
+						used.insert(kb);
+						if (apz[i] && amz[i]) {
+						} else if (apz[i] && !amz[i]) {
+							cnt++;
+						} else if (!apz[i] && amz[i]) {
+						} else {
+							cnt++;
+						}
+					}
+				}
+			}
+			used.clear();
+			if (used.find(k) == used.end()) {
+				if (k != 0 && !(k == N / 2 && N % 2 == 0)) {
+					used.insert(k);
+					for (int i = 0; i < r; i++) {
+						if (!iz[i]) {
+							cnt++;
+						}
+					}
+				}
+			}
+			for (int i = 1; i <= (r - 1) / 2; i++) {
+				const int ka = k + i * N / r;
+				const int ik0 = index_real(o, ka, 1, N);
+				if (used.find(ka) == used.end() && ka != 0 && !(ka == N / 2 && N % 2 == 0)) {
+					used.insert(ka);
+					if (bpz[i] && bmz[i]) {
+					} else if (bpz[i] && !bmz[i]) {
+						cnt++;
+					} else if (!bpz[i] && bmz[i]) {
+					} else {
+						cnt++;
+					}
+				}
+			}
+			for (int i = 1; i <= (r - 1) / 2; i++) {
+				const int kb = N - (k + (r - i) * N / r);
+				const int ik1 = index_real(o, kb, 1, N);
+				if (used.find(kb) == used.end() && kb != 0 && !(kb == N / 2 && N % 2 == 0)) {
+					used.insert(kb);
+					if (bpz[i] && bmz[i]) {
+					} else if (bpz[i] && !bmz[i]) {
+						cnt++;
+					} else if (!bpz[i] && bmz[i]) {
+						cnt++;
+					} else {
+						cnt += 2;
+					}
+				}
+			}
+		}
+		}
+	}
+
+	return cnt;
 }
