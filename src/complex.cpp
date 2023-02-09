@@ -432,27 +432,30 @@ fft_type best_radix(int N, int o, bool first) {
 	}
 	if (N > 6 && N != 10) {
 		auto pfac = prime_fac(N);
-		if (pfac.size() == 2) {
-			int N1, N2;
-			auto i = pfac.begin();
-			N1 = pow(i->first, i->second);
-			i++;
-			N2 = pow(i->first, i->second);
-			if (is_prime(N1) && is_prime(N2)) {
-				if (N1 > N2) {
-					std::swap(N1, N2);
+		if (pfac.size() >= 2) {
+			int N1 = 1, N2 = 1;
+			int arrow = 1;
+			for (auto i = pfac.begin(); i != pfac.end(); i++) {
+				if (arrow > 0) {
+					N1 *= pow(i->first, i->second);
+				} else {
+					N2 *= pow(i->first, i->second);
 				}
-				int gt_cnt = gt2_fft_opcnt(N1, N2);
-				if (first) {
-					gt_cnt += N * MWEIGHT;
-				}
-				if (gt_cnt < best_cnt) {
-					fftt.type = GOOD;
-					fftt.N1 = N1;
-					fftt.N2 = N2;
-					fftt.N3 = -1;
-					fftt.nops = gt_cnt;
-				}
+				arrow = -arrow;
+			}
+			if (N1 > N2) {
+				std::swap(N1, N2);
+			}
+			int gt_cnt = gt2_fft_opcnt(N1, N2);
+			if (first) {
+				gt_cnt += N * MWEIGHT;
+			}
+			if (gt_cnt < best_cnt) {
+				fftt.type = GOOD;
+				fftt.N1 = N1;
+				fftt.N2 = N2;
+				fftt.N3 = -1;
+				fftt.nops = gt_cnt;
 			}
 		}
 	}

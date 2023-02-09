@@ -2,17 +2,14 @@
 
 void gt_fft(int N, int o);
 
-
-
 int gt2_fft_opcnt(int N1, int N2) {
 	int N = N1 * N2;
 	int cnt = 0;
 	cnt += N2 * fft_opcnt(N1);
 	cnt += N1 * fft_opcnt(N2);
+	cnt += MWEIGHT * N;
 	return cnt;
 }
-
-
 
 void gt2_fft(int N1, int N2, int o) {
 	printf("// good-thomas - %i = %i x %i\n", N1 * N2, N1, N2);
@@ -20,6 +17,7 @@ void gt2_fft(int N1, int N2, int o) {
 	indent();
 	int N = N1 * N2;
 	for (int n1 = 0; n1 < N1; n1++) {
+		//	fft_bitreverse(N2, fft_bitreverse_indices(N2), o + n1 * N2);
 		fft(N2, n1 * N2 + o);
 	}
 	print("std::array<std::array<double, %i>, %i> z;\n", 2 * N1, N2);
@@ -31,6 +29,7 @@ void gt2_fft(int N1, int N2, int o) {
 		print("{\n");
 		indent();
 		print("auto* x = z[%i].data();\n", n2);
+		fft_bitreverse(N1, fft_bitreverse_indices(N1), 0);
 		fft(N1, 0);
 		deindent();
 		print("}\n");
