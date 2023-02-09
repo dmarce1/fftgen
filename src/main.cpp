@@ -252,7 +252,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	print_notab("};\n\n");
-
+	print("#define MAXFFT %i\n", MAXFFT);
 	include( "../gen_src/fft.cpp");
 
 	set_file("Makefile");

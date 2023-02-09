@@ -26,7 +26,6 @@ std::vector<int> fft_bitr_real(int N, int o, std::vector<int> indices, bool firs
 		return indices;
 	}
 }
-
 std::vector<int> fft_radix_bitr_real(int r, int N, int o, std::vector<int> I) {
 	std::vector<int> L;
 	std::vector<int> J;
@@ -34,23 +33,7 @@ std::vector<int> fft_radix_bitr_real(int r, int N, int o, std::vector<int> I) {
 	switch (r) {
 	case 1:
 		return I;
-		/*case 4: {
-		 std::vector<int> J;
-		 for (int k = 0; k < N / 2; k++) {
-		 J.push_back(I[2 * k]);
-		 }
-		 auto K = fft_bitr_real(N / 2, o, J);
-		 L.insert(L.end(), K.begin(), K.end());
-		 }
-		 for (int n = 1; n < 4; n += 2) {
-		 std::vector<int> J;
-		 for (int k = 0; k < N / r; k++) {
-		 J.push_back(I[n + 4 * k]);
-		 }
-		 auto K = fft_bitr_real(N / 4, o + (2 + (n / 2)) * N / 4, J);
-		 L.insert(L.end(), K.begin(), K.end());
-		 }
-		 break;*/
+
 	default:
 		for (int n = 0; n < r; n++) {
 			std::vector<int> J;
@@ -194,8 +177,6 @@ int fft_real_opcnt(int N, int o) {
 int mod(int n, int N) {
 	return (n + N) % N;
 }
-
-
 void fft_radix_real(int r, int N, int o, bool first) {
 	if (N < r) {
 		return;
@@ -226,25 +207,25 @@ void fft_radix_real(int r, int N, int o, bool first) {
 					iz[i] = true;
 				} else if (i * k == N / 8 && N % 8 == 0) {
 					print("const auto zr%i = M_SQRT1_2 * (x[%i]);\n", i, iir);
-					print("const auto zi%i = -M_SQRT1_2 * (x[%i]);\n", i, iir);
+					print("const auto zi%i = -zr%i;\n", i, i);
 				} else if (i * k == N / 4 && N % 4 == 0) {
 					print("const auto zi%i = -x[%i];\n", i, iir);
 					rz[i] = true;
 				} else if (i * k == 3 * N / 8 && N % 8 == 0) {
 					print("const auto zr%i = -M_SQRT1_2 * x[%i];\n", i, iir);
-					print("const auto zi%i = -M_SQRT1_2 * x[%i];\n", i, iir);
+					print("const auto& zi%i = zr%i;\n", i, i);
 				} else if (i * k == N / 2 && N % 2 == 0) {
 					print("const auto zr%i = -x[%i];\n", i, iir);
 					iz[i] = true;
 				} else if (i * k == 5 * N / 8 && N % 8 == 0) {
-					print("const auto zr%i = -M_SQRT1_2 * x[%i];\n", i, iir);
 					print("const auto zi%i = M_SQRT1_2 * x[%i];\n", i, iir);
+					print("const auto zr%i = -zi%i;\n", i, i);
 				} else if (i * k == 3 * N / 4 && N % 4 == 0) {
 					print("const auto zi%i = x[%i];\n", i, iir);
 					rz[i] = true;
 				} else if (i * k == 7 * N / 8 && N % 8 == 0) {
 					print("const auto zr%i = M_SQRT1_2 * (x[%i]);\n", i, iir);
-					print("const auto zi%i = M_SQRT1_2 * (x[%i]);\n", i, iir);
+					print("const auto& zi%i = zr%i;\n", i, i);
 				} else {
 					print("const auto zr%i = (%.17e) * x[%i];\n", i, W.real(), iir);
 					print("const auto zi%i = (%.17e) * x[%i];\n", i, W.imag(), iir);
@@ -1629,14 +1610,22 @@ int fft_radix_real_opcnt(int r, int N, int o) {
 				const int iii = index_real(oo, k, 1, L);
 				if (i * k == 0) {
 					iz[i] = true;
+				} else if (i * k == N / 8 && N % 8 == 0) {
+					cnt += 2;
 				} else if (i * k == N / 4 && N % 4 == 0) {
 					cnt++;
 					rz[i] = true;
+				} else if (i * k == 3 * N / 8 && N % 8 == 0) {
+					cnt++;
 				} else if (i * k == N / 2 && N % 2 == 0) {
 					cnt++;
 					iz[i] = true;
+				} else if (i * k == 5 * N / 8 && N % 8 == 0) {
+					cnt += 2;
 				} else if (i * k == 3 * N / 4 && N % 4 == 0) {
 					rz[i] = true;
+				} else if (i * k == 7 * N / 8 && N % 8 == 0) {
+					cnt++;
 				} else {
 					cnt += 2;
 				}

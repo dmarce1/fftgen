@@ -107,8 +107,6 @@ void raders_fft_real(int N, int o) {
 	print("double xok = x[%i];\n", o);
 	print("double xo = x[%i];\n", o);
 	print("std::array<double, %i> z;\n", L);
-	print("std::array<std::complex<double>, %i> Z;\n", L / 2 + 1);
-	print("std::array<double, %i> y;\n", L);
 	for (int q = 0; q < L; q++) {
 		print("xo += x[%i];\n", o + q + 1);
 	}
