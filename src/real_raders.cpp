@@ -196,7 +196,7 @@ int raders_fft_real_opcnt(int N, int o) {
 	for (int q = 0; q < L; q++) {
 		cnt++;
 	}
-	cnt += fft_real_opcnt(L, 0);
+	cnt += 2 * fft_real_opcnt(L, 0);
 	cnt += 2;
 	for (int q = 0; q < L / 2; q += 2) {
 		if (q != 0) {
@@ -204,7 +204,6 @@ int raders_fft_real_opcnt(int N, int o) {
 		}
 		cnt += 4;
 	}
-	cnt += fft_real_opcnt(L, 0);
 	for (int q = 0; q < L; q++) {
 		cnt++;
 	}

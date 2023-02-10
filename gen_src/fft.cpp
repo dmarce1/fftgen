@@ -181,6 +181,80 @@ void fftw_real_inv(const std::vector<std::complex<double>>& xout, std::vector<do
 
 }
 
+void good_thomas(int N1, int N2, std::vector<std::complex<double>>& X) {
+	int N = N1 * N2;
+	std::vector<std::vector<std::complex<double>>>Y(N1, std::vector<std::complex<double>>(N2));
+	std::vector<std::vector<std::complex<double>>>Z(N2, std::vector<std::complex<double>>(N1));
+	for (int n1 = 0; n1 < N1; n1++) {
+		for (int n2 = 0; n2 < N2; n2++) {
+			Y[n1][n2] = X[(N1 * n2 + N2 * n1) % N];
+		}
+	}
+	for (int n1 = 0; n1 < N1; n1++) {
+		fftw(Y[n1]);
+	}
+	for (int n1 = 0; n1 < N1; n1++) {
+		for (int n2 = 0; n2 < N2; n2++) {
+			Z[n2][n1] = Y[n1][n2];
+		}
+	}
+	for (int n2 = 0; n2 < N2; n2++) {
+		fftw(Z[n2]);
+	}
+	for (int n = 0; n < N; n++) {
+		int n1 = n % N1;
+		int n2 = n % N2;
+		X[n] = Z[n2][n1];
+	}
+}
+
+void good_thomas(int N1, int N2, std::vector<std::complex<double>>& X, std::vector<double> x) {
+	int N = N1 * N2;
+	std::vector<std::vector<double>> y(N1, std::vector<double>(N2));
+	std::vector<std::vector<std::complex<double>>>Y(N1, std::vector<std::complex<double>>(N2 / 2 + 1));
+	std::vector<double> z(N1);
+	std::vector<std::vector<std::complex<double>>>Z(N2 / 2 + 1, std::vector<std::complex<double>>(N1));
+	std::vector<std::complex<double>> Z1(N1 / 2 + 1);
+	for (int n1 = 0; n1 < N1; n1++) {
+		for (int n2 = 0; n2 < N2; n2++) {
+			y[n1][n2] = x[(N1 * n2 + N2 * n1) % N];
+		}
+	}
+	for (int n1 = 0; n1 < N1; n1++) {
+		fftw_real(Y[n1], y[n1]);
+	}
+	for (int n1 = 0; n1 < N1; n1++) {
+		z[n1] = Y[n1][0].real();
+		for (int n2 = 1; n2 < N2 / 2 + 1; n2++) {
+			Z[n2 - 1][n1] = Y[n1][n2];
+		}
+	}
+	fftw_real(Z1, z);
+	for (int n2 = 1; n2 < N2 / 2 + 1; n2++) {
+		fftw(Z[n2 - 1]);
+	}
+	for (int n = 0; n < N / 2 + 1; n++) {
+		int n1 = n % N1;
+		int n2 = n % N2;
+		if (n2 == 0) {
+			if (n1 > N1 / 2) {
+				X[n] = std::conj(Z1[N1 - n1]);
+			} else {
+				X[n] = Z1[n1];
+			}
+		} else if (n2 > N2 / 2) {
+			if (n1 != 0) {
+				X[n] = std::conj(Z[N2 - n2 - 1][N1 - n1]);
+			} else {
+				X[n] = std::conj(Z[N2 - n2 - 1][0]);
+			}
+		} else {
+			X[n] = Z[n2 - 1][n1];
+		}
+
+	}
+}
+
 double rand1() {
 	return (rand() + 0.5) / RAND_MAX;
 }
@@ -198,7 +272,7 @@ void test() {
 		timer tm1, tm2;
 		double err;
 		double max;
-		for (int ti = 0; ti < 256; ti++) {
+		for (int ti = 0; ti < 1; ti++) {
 			err = 0.0;
 			max = 0.0;
 			std::vector<std::complex<double>> X(N / 2 + 1);
@@ -225,7 +299,7 @@ void test() {
 			}
 			for (int n = 0; n < N / 2 + 1; n++) {
 				err += std::abs(Y[n]) * std::abs(Y[n]);
-				//	printf("%i %16.6e %16.6e %16.6e %16.6e\n", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());
+				printf("%i %16.6e %16.6e %16.6e %16.6e\n", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());
 				max = std::max(max, std::abs(X[n]));
 			}
 			err = sqrt(err / N) / max;

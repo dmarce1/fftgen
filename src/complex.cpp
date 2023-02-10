@@ -430,7 +430,7 @@ fft_type best_radix(int N, int o, bool first) {
 			fftt.nops = best_cnt;
 		}
 	}
-	if (N > 6 && N != 10) {
+	if (N > 6 ) {
 		auto pfac = prime_fac(N);
 		if (pfac.size() >= 2) {
 			int N1 = 1, N2 = 1;

@@ -19,7 +19,7 @@
 #define GOOD 2
 #define MWEIGHT (1.5)
 constexpr int NPAR = 4;
-#define MAXFFT 128
+#define MAXFFT 28
 #define DFFT 1
 
 struct fft_type {
@@ -34,8 +34,10 @@ void indent();
 void deindent();
 FILE* get_fp();
 int get_ntabs();
+void gt2_fft_real(int N1, int N2, int o);
 void raders_fft_real_inv(int N, int o);
 void include(const char* name);
+void fft_complex_real(int N);
 void set_file(std::string str);
 std::complex<double> twiddle(int k, int N);
 std::string to_str(std::complex<double> z);

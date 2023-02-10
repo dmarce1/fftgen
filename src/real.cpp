@@ -20,12 +20,101 @@ std::vector<int> fft_bitr_real(int N, int o, std::vector<int> indices, bool firs
 	auto fftt = best_radix_real(N, o, first);
 	if (fftt.type == RADIX) {
 		return fft_radix_bitr_real(fftt.N1, N, o, indices);
-//	} else if (fftt.type == GOOD) {
-//		return gt2_fft_bitr(fftt.N1, fftt.N2, o, indices);
+	} else if (fftt.type == GOOD) {
+		return indices;
 	} else {
 		return indices;
 	}
 }
+
+void gt2_fft_real(int N1, int N2, int o) {
+	printf("// good-thomas real - %i = %i x %i\n", N1 * N2, N1, N2);
+	print("{\n");
+	indent();
+	int N = N1 * N2;
+	std::vector<std::vector<double>> y(N1, std::vector<double>(N2));
+	std::vector<std::vector<std::complex<double>>>Y(N1, std::vector<std::complex<double>>(N2 / 2 + 1));
+	std::vector<double> z(N1);
+	std::vector<std::vector<std::complex<double>>>Z(N2 / 2 + 1, std::vector<std::complex<double>>(N1));
+	std::vector<std::complex<double>> Z1(N1 / 2 + 1);
+	print("std::array<double, %i> y;\n", N);
+	print("std::array<double, %i> z0;\n", N1);
+	print("std::array<std::array<double, %i>, %i> z1;\n", 2 * N1, N2 / 2);
+	for (int n1 = 0; n1 < N1; n1++) {
+		for (int n2 = 0; n2 < N2; n2++) {
+//			y[n1][n2] = x[(N1 * n2 + N2 * n1) % N];
+			print("y[%i] = x[%i];\n", n1 * N2 + n2, (N1 * n2 + N2 * n1) % N);
+		}
+	}
+	for (int n1 = 0; n1 < N1; n1++) {
+		print("{\n");
+		indent();
+		print("auto* x = y.data() + %i;", n1 * N2);
+		fft_bitreverse_real(N2);
+		fft_real(N2, 0);
+		deindent();
+		print("}\n");
+	}
+	for (int n1 = 0; n1 < N1; n1++) {
+		print("z0[%i] = y[%i];\n", n1, n1 * N2);
+		for (int n2 = 1; n2 < N2 / 2 + 1; n2++) {
+			print("z1[%i][%i] = y[%i];\n", n2 - 1, 2 * n1, n1 * N2 + n2);
+			if (n2 != 0 && !(N2 % 2 == 0 && n2 == N2 / 2)) {
+				print("z1[%i][%i] = y[%i];\n", n2 - 1, 2 * n1 + 1, n1 * N2 + N2 - n2);
+			}
+		}
+	}
+	print("{\n");
+	indent();
+	print("auto* x = z0.data();\n");
+	fft_bitreverse_real(N1);
+	fft_real(N1, 0);
+	deindent();
+	print("}\n");
+	for (int n2 = 1; n2 < N2 / 2 + 1; n2++) {
+		print("{\n");
+		indent();
+		print("auto* x = z1[%i].data();\n", n2 - 1);
+		fft_bitreverse(N1);
+		fft(N1, 0);
+		deindent();
+		print("}\n");
+	}
+	for (int n = 0; n < N / 2 + 1; n++) {
+		int n1 = n % N1;
+		int n2 = n % N2;
+		if (n2 == 0) {
+			if (n1 >= N1 / 2 + 1) {
+				print("x[%i] = z0[%i];\n", n, N1 - n1);
+				if (n != 0 && !(N % 2 == 0 && n == N / 2)) {
+					print("x[%i] = -z0[%i];\n", N - n, n1);
+				}
+			} else {
+				print("x[%i] = z0[%i];\n", n, n1);
+				if (n != 0 && !(N % 2 == 0 && n == N / 2)) {
+					print("x[%i] = z0[%i];\n", N - n, N1 - n1);
+				}
+			}
+		} else {
+			if (n2 < N2 / 2 + 1) {
+				print("x[%i] = z1[%i][%i];\n", n, n2 - 1, 2 * n1);
+				if (n != 0 && !(N % 2 == 0 && n == N / 2)) {
+					print("x[%i] = z1[%i][%i];\n", N - n, n2 - 1, 2 * n1 + 1);
+				}
+			} else {
+				const int ni = n1 == 0 ? 0 : N1 - n1;
+				print("x[%i] = z1[%i][%i];\n", n, N2 - n2 - 1, 2 * ni);
+				if (n != 0 && !(N % 2 == 0 && n == N / 2)) {
+					print("x[%i] = -z1[%i][%i];\n", N - n, N2 - n2 - 1, 2 * ni + 1);
+				}
+
+			}
+		}
+	}
+	deindent();
+	print("}\n");
+}
+
 std::vector<int> fft_radix_bitr_real(int r, int N, int o, std::vector<int> I) {
 	std::vector<int> L;
 	std::vector<int> J;
@@ -154,6 +243,35 @@ fft_type best_radix_real(int N, int o, bool first) {
 			fftt.nops = best_cnt;
 		}
 	}
+	if (N > 6) {
+		auto pfac = prime_fac(N);
+		if (pfac.size() >= 2) {
+			int N1 = 1, N2 = 1;
+			int arrow = 1;
+			for (auto i = pfac.begin(); i != pfac.end(); i++) {
+				if (arrow > 0) {
+					N1 *= pow(i->first, i->second);
+				} else {
+					N2 *= pow(i->first, i->second);
+				}
+				arrow = -arrow;
+			}
+			if (N1 > N2) {
+				std::swap(N1, N2);
+			}
+			//	int gt_cnt = gt2_fft_opcnt(N1, N2);
+			if (first) {
+				//			gt_cnt += N * MWEIGHT;
+			}
+			//		if (gt_cnt < best_cnt) {
+			fftt.type = GOOD;
+			fftt.N1 = N1;
+			fftt.N2 = N2;
+			fftt.N3 = -1;
+			fftt.nops = 0;
+			//	}
+		}
+	}
 	return fftt;
 }
 
@@ -166,6 +284,8 @@ void fft_real(int N, int o, bool first) {
 		fft_radix_real(fftt.N1, N, o);
 	} else if (fftt.type == RADERS) {
 		raders_fft_real(fftt.N1, o);
+	} else if (fftt.type == GOOD) {
+		gt2_fft_real(fftt.N1, fftt.N2, o);
 	}
 }
 
@@ -177,6 +297,39 @@ int fft_real_opcnt(int N, int o) {
 int mod(int n, int N) {
 	return (n + N) % N;
 }
+
+void fft_complex_real(int N) {
+	print("{\n");
+	indent();
+	print("std::array<double, %i> z;\n", 2 * (N / 2));
+	fft_bitreverse(N / 2);
+	fft(N / 2, 0, true);
+	for (int k = 0; k <= N / 4; k++) {
+		print("{\n");
+		indent();
+		print("const auto Xer = 0.5 * (x[%i] + x[%i]);\n", 2 * k, 2 * ((N / 2 - k) % (N / 2)));
+		print("const auto Xei = 0.5 * (x[%i] - x[%i]);\n", 2 * k + 1, 2 * ((N / 2 - k) % (N / 2)) + 1);
+		print("const auto Xoi = -0.5 * (x[%i] - x[%i]);\n", 2 * k, 2 * ((N / 2 - k) % (N / 2)));
+		print("const auto Xor = 0.5 * (x[%i] + x[%i]);\n", 2 * k + 1, 2 * ((N / 2 - k) % (N / 2)) + 1);
+		const auto W = twiddle(k, N);
+		print("z[%i] = Xer + Xor * (%.17e) - Xoi * (%.17e);\n", k, W.real(), W.imag());
+		if (k != 0) {
+			print("z[%i] = Xer - Xor * (%.17e) + Xoi * (%.17e);\n", N / 2 - k, W.real(), W.imag());
+			print("z[%i] = Xei + Xor * (%.17e) + Xoi * (%.17e);\n", N - k, W.imag(), W.real());
+			print("z[%i] = -Xei + Xor * (%.17e) + Xoi * (%.17e);\n", N / 2 + k, W.imag(), W.real());
+		} else {
+			print("z[%i] = Xer - Xor;\n", N / 2);
+		}
+		deindent();
+		print("}\n");
+	}
+	for (int k = 0; k < N; k++) {
+		print("x[%i] = z[%i];\n", k, k);
+	}
+	deindent();
+	print("}\n");
+}
+
 void fft_radix_real(int r, int N, int o, bool first) {
 	if (N < r) {
 		return;
