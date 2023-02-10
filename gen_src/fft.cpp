@@ -299,7 +299,7 @@ void test() {
 			}
 			for (int n = 0; n < N / 2 + 1; n++) {
 				err += std::abs(Y[n]) * std::abs(Y[n]);
-				printf("%i %16.6e %16.6e %16.6e %16.6e\n", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());
+		//		printf("%i %16.6e %16.6e %16.6e %16.6e\n", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());
 				max = std::max(max, std::abs(X[n]));
 			}
 			err = sqrt(err / N) / max;
@@ -307,6 +307,7 @@ void test() {
 		printf("%4i %4i %e %e %e %e %e %e %e\n", N, fft_nops_real[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());
 	}
 	tm3.reset();
+	return;
 	tm4.reset();
 	printf("\ncomplex\n");
 	for (int N = 2; N <= MAXFFT; N += 1) {

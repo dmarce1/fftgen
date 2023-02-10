@@ -44,12 +44,8 @@ void print_fft_real(int N) {
 		print("double tmp%i;\n", n);
 	}
 	print("double* x = reinterpret_cast<double*>(x0);\n");
-	if (N % 2 == 5) {
-		fft_complex_real(N);
-	} else {
-		fft_bitreverse_real(N);
-		fft_real(N, 0, true);
-	}
+	fft_bitreverse_real(N);
+	fft_real(N, 0, true);
 	print("y[%i] = x[%i];\n", 0, 0);
 	print("y[%i] = 0;\n", 1);
 	for (int n = 1; n < (N + 1) / 2; n++) {
@@ -259,8 +255,8 @@ int main(int argc, char **argv) {
 
 	set_file("Makefile");
 	print("CC=g++\n");
-	print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
-	//print("CFLAGS=-I. -Ofast -march=native\n");
+	//print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
+	print("CFLAGS=-I. -Ofast -march=native\n");
 	print("DEPS = fft.hpp\n");
 	print("OBJ = fft.o ");
 	for (int n = 2; n <= MAXFFT; n += DFFT) {

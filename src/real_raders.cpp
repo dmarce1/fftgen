@@ -117,7 +117,7 @@ void raders_fft_real(int N, int o) {
 	indent();
 	print("auto* x = z.data();\n");
 	fft_bitreverse_real(L);
-	fft_real(L, 0);
+	fft_real(L, 0, true);
 	deindent();
 	print("}\n");
 	print("z[0] *= -1.0;\n");
@@ -156,7 +156,7 @@ void raders_fft_real(int N, int o) {
 		print("x[%i] = z[%i];\n", o + L / 2, L / 2);
 	}
 	fft_bitreverse_real(L, fft_bitreverse_indices_real(L), o);
-	fft_real(L, o);
+	fft_real(L, o, true);
 	print("z[0] = x[%i];\n", o);
 	for (int n = 1; n < L; n++) {
 		if (n <= L - n) {

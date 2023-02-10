@@ -19,7 +19,7 @@
 #define GOOD 2
 #define MWEIGHT (1.5)
 constexpr int NPAR = 4;
-#define MAXFFT 28
+#define MAXFFT 128
 #define DFFT 1
 
 struct fft_type {
