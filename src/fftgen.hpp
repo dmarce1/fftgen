@@ -17,6 +17,7 @@
 #define RADERS 0
 #define RADIX 1
 #define GOOD 2
+#define COOLEY 3
 #define MWEIGHT (1.5)
 constexpr int NPAR = 4;
 #define MAXFFT 128

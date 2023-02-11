@@ -1,6 +1,115 @@
 #include "fftgen.hpp"
 #include <list>
 
+void ct_fft(int N1, int N2, int o) {
+	printf("// cooley-tukey - %i = %i x %i\n", N1 * N2, N1, N2);
+	print("{\n");
+	indent();
+	int N = N1 * N2;
+	for (int n1 = 0; n1 < N1; n1++) {
+		fft(N2, n1 * N2 + o);
+	}
+	print("std::array<std::array<double, %i>, %i> z;\n", 2 * N1, N2);
+	auto I = fft_bitreverse_indices(N1);
+	for (int k2 = 0; k2 < N2; k2++) {
+		for (int n1 = 0; n1 < N1; n1++) {
+			const auto W = twiddle(k2 * I[n1], N);
+			if (k2 * I[n1] == 0) {
+				print("z[%i][%i] = x[%i];\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 0, N2));
+				print("z[%i][%i] = x[%i];\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 1, N2));
+			} else if (k2 * I[n1] == N / 8 && N % 8 == 0) {
+				print("z[%i][%i] = M_SQRT1_2 * (x[%i] + x[%i]);\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 0, N2), index(N2 * I[n1] + o, k2, 1, N2));
+				print("z[%i][%i] = -M_SQRT1_2 * (x[%i] - x[%i]);\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 0, N2), index(N2 * I[n1] + o, k2, 1, N2));
+			} else if (k2 * I[n1] == 3 * N / 8 && N % 8 == 0) {
+				print("z[%i][%i] = -M_SQRT1_2 * (x[%i] - x[%i]);\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 0, N2), index(N2 * I[n1] + o, k2, 1, N2));
+				print("z[%i][%i] = -M_SQRT1_2 * (x[%i] + x[%i]);\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 0, N2), index(N2 * I[n1] + o, k2, 1, N2));
+			} else if (k2 * I[n1] == 5 * N / 8 && N % 8 == 0) {
+				print("z[%i][%i] = -M_SQRT1_2 * (x[%i] + x[%i]);\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 0, N2), index(N2 * I[n1] + o, k2, 1, N2));
+				print("z[%i][%i] = M_SQRT1_2 * (x[%i] - x[%i]);\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 0, N2), index(N2 * I[n1] + o, k2, 1, N2));
+			} else if (k2 * I[n1] == 7 * N / 8 && N % 8 == 0) {
+				print("z[%i][%i] = M_SQRT1_2 * (x[%i] - x[%i]);\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 0, N2), index(N2 * I[n1] + o, k2, 1, N2));
+				print("z[%i][%i] = M_SQRT1_2 * (x[%i] + x[%i]);\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 0, N2), index(N2 * I[n1] + o, k2, 1, N2));
+			} else if (k2 * I[n1] == N / 2 && N % 2 == 0) {
+				print("z[%i][%i] = -x[%i];\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 0, N2));
+				print("z[%i][%i] = -x[%i];\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 1, N2));
+			} else if (k2 * I[n1] == N / 4 && N % 4 == 0) {
+				print("z[%i][%i] = x[%i];\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 1, N2));
+				print("z[%i][%i] = -x[%i];\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 0, N2));
+			} else if (k2 * I[n1] == 3 * N / 4 && N % 4 == 0) {
+				print("z[%i][%i] = -x[%i];\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 1, N2));
+				print("z[%i][%i] = x[%i];\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 0, N2));
+			} else {
+				print("z[%i][%i] = std::fma(x[%i], (%.17e), x[%i] * (%.17e));\n", k2, 2 * n1 + 0, index(N2 * I[n1] + o, k2, 0, N2), W.real(), index(N2 * I[n1] + o, k2, 1, N2), -W.imag());
+				print("z[%i][%i] = std::fma(x[%i], (%.17e), x[%i] * (%.17e));\n", k2, 2 * n1 + 1, index(N2 * I[n1] + o, k2, 0, N2), W.imag(), index(N2 * I[n1] + o, k2, 1, N2), W.real());
+			}
+		}
+	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		print("{\n");
+		indent();
+		print("auto* x = z[%i].data();\n", k2);
+		fft(N1, 0);
+		deindent();
+		print("}\n");
+	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		for (int k1 = 0; k1 < N1; k1++) {
+			print("x[%i] = z[%i][%i];\n", index(o + N2 * k1, k2, 0, N), k2, 2 * k1 + 0);
+			print("x[%i] = z[%i][%i];\n", index(o + N2 * k1, k2, 1, N), k2, 2 * k1 + 1);
+		}
+	}
+	deindent();
+	print("}\n");
+}
+
+
+int ct_fft_opcnt(int N1, int N2) {
+	int cnt = 0;
+	int N = N1 * N2;
+	for (int n1 = 0; n1 < N1; n1++) {
+		cnt += fft_opcnt(N2, 0);
+	}
+	auto I = fft_bitreverse_indices(N1);
+	for (int k2 = 0; k2 < N2; k2++) {
+		for (int n1 = 0; n1 < N1; n1++) {
+			const auto W = twiddle(k2 * I[n1], N);
+			if (k2 * I[n1] == 0) {
+			} else if (k2 * I[n1] == N / 2 && N % 2 == 0) {
+				cnt += 2;
+			} else if (k2 * I[n1] == N / 4 && N % 4 == 0) {
+				cnt += 1;
+			} else if (k2 * I[n1] == 3 * N / 4 && N % 4 == 0) {
+				cnt += 1;
+			} else {
+				cnt += 4;
+			}
+		}
+	}
+	for (int k2 = 0; k2 < N2; k2++) {
+		cnt += fft_opcnt(N1, 0);
+	}
+	return cnt;
+}
+
+std::vector<int> ct_fft_bitr(int N1, int N2, int o, std::vector<int> I) {
+	printf("--?? %i %i\n", N1, N2);
+	if (N1 == 8 && N2 == 14) {
+		abort();
+	}
+	int r = N1;
+	int N = N1 * N2;
+	std::vector<int> L;
+	for (int n = 0; n < r; n++) {
+		std::vector<int> J;
+		for (int k = 0; k < N / r; k++) {
+			J.push_back(I[n + r * k]);
+		}
+		auto K = fft_bitr(N / r, o + n * N / r, J);
+		L.insert(L.end(), K.begin(), K.end());
+	}
+	return L;
+}
+
 void print_z(int zi, int twi, int loci, int k, int r, int N, int o, bool ref) {
 	const auto W = twiddle(twi * k, N);
 	const int i = k + loci * N / r;
@@ -186,6 +295,9 @@ std::vector<int> fft_bitr(int N, int o, std::vector<int> indices, bool first) {
 		return fft_radix_bitr(fftt.N1, N, o, indices);
 	} else if (fftt.type == GOOD) {
 		return gt2_fft_bitr(fftt.N1, fftt.N2, o, indices);
+	} else if (fftt.type == COOLEY) {
+		printf("----%i %i\n", fftt.N1, fftt.N2);
+		return ct_fft_bitr(fftt.N1, fftt.N2, o, indices);
 	} else {
 		return indices;
 	}
@@ -430,7 +542,7 @@ fft_type best_radix(int N, int o, bool first) {
 			fftt.nops = best_cnt;
 		}
 	}
-	if (N > 6 ) {
+	if (N > 6) {
 		auto pfac = prime_fac(N);
 		if (pfac.size() >= 2) {
 			int N1 = 1, N2 = 1;
@@ -443,10 +555,7 @@ fft_type best_radix(int N, int o, bool first) {
 				}
 				arrow = -arrow;
 			}
-			if (N1 > N2) {
-				std::swap(N1, N2);
-			}
-			int gt_cnt = gt2_fft_opcnt(N1, N2);
+			int gt_cnt = ct_fft_opcnt(N1, N2);
 			if (first) {
 				gt_cnt += N * MWEIGHT;
 			}
@@ -456,6 +565,28 @@ fft_type best_radix(int N, int o, bool first) {
 				fftt.N2 = N2;
 				fftt.N3 = -1;
 				fftt.nops = gt_cnt;
+			}
+		} else if (false){
+			int N1 = sqrt(N);
+			int N2;
+			N2 = N / N1;
+			while (N % N1 != 0) {
+				N1--;
+				N2 = N / N1;
+			}
+			if (N1 > 7 && N2 > 7) {
+				int ct_cnt = gt2_fft_opcnt(N1, N2);
+				if (first) {
+					//	ct_cnt += N * MWEIGHT;
+				}
+				if (0 < best_cnt) {
+					printf("%i %i\n", N1, N2);
+					fftt.type = COOLEY;
+					fftt.N1 = N1;
+					fftt.N2 = N2;
+					fftt.N3 = -1;
+					fftt.nops = 0;
+				}
 			}
 		}
 	}
@@ -480,6 +611,9 @@ void fft(int N, int o, bool first) {
 	}
 	if (fftt.type == GOOD) {
 		gt2_fft(fftt.N1, fftt.N2, o);
+	}
+	if (fftt.type == COOLEY) {
+		ct_fft(fftt.N1, fftt.N2, o);
 	}
 }
 int fft_radix_opcnt(int r, int N) {
