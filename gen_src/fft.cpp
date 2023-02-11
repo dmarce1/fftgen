@@ -93,7 +93,7 @@ void FFT_real_inv(std::complex<double>* X, double* y, int N) {
 }
 
 void FFT(std::complex<double>* x, int N) {
-	(*(fptr[N]))(x);
+	(*(fptr[N]))(reinterpret_cast<double*>(x));
 }
 
 void FFT_inv(std::complex<double>* x, int N) {
@@ -101,7 +101,7 @@ void FFT_inv(std::complex<double>* x, int N) {
 	for (int n = 0; n < N; n++) {
 		x[n] = std::conj(x[n]);
 	}
-	(*(fptr[N]))(x);
+	(*(fptr[N]))(reinterpret_cast<double*>(x));
 	for (int n = 0; n < N; n++) {
 		x[n] = std::conj(x[n]) * Ninv;
 	}

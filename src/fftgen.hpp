@@ -20,7 +20,7 @@
 #define COOLEY 3
 #define MWEIGHT (1.5)
 constexpr int NPAR = 4;
-#define MAXFFT 128
+#define MAXFFT 64
 #define DFFT 1
 
 struct fft_type {

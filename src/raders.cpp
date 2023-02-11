@@ -217,23 +217,24 @@ void raders_fft(int N, int o, bool padded) {
 	I1[N - 1] = 0;
 	fft_bitreverse(N, I1, o);
 
-	print("{\n");
-	indent();
-	fft(N - 1, o, true);
-	deindent();
-	print("}\n");
+//	print("{\n");
+//	indent();
+	print("fft_base_%i(x + %i);\n", N - 1, 2 * o);
+//	fft(N - 1, o, true);
+//	deindent();
+//	print("}\n");
 	print("x[%i] = -x[%i];\n", index(o, 0, 0, N - 1), index(o, 0, 0, N - 1));
 	for (int q = 1; q < N - 1; q++) {
 		print("tmp0 = x[%i];\n", index(o, q, 0, N - 1));
 		print("x[%i] = std::fma((%.17e), x[%i], (%.17e) * x[%i]);\n", index(o, q, 0, N - 1), b[q].real(), index(o, q, 0, N - 1), -b[q].imag(), index(o, q, 1, N - 1));
 		print("x[%i] = std::fma((%.17e), tmp0, (%.17e) * x[%i]);\n", index(o, q, 1, N - 1), -b[q].imag(), -b[q].real(), index(o, q, 1, N - 1));
 	}
-	fft_bitreverse(N - 1, fft_bitreverse_indices(N - 1), o);
-	print("{\n");
-	indent();
-	fft(N - 1, o, true);
-	deindent();
-	print("}\n");
+	//fft_bitreverse(N - 1, fft_bitreverse_indices(N - 1), o);
+//	print("{\n");
+//	indent();
+	print("fft_%i(x + %i);\n", N - 1, 2 * o);
+//	deindent();
+//	print("}\n");
 	const auto Nm1inv = 1.0 / (N - 1.0);
 	for (int q = 0; q < N - 1; q++) {
 		print("x[%i] *= (%24.17e);\n", index(o, q, 0, N - 1), Nm1inv);

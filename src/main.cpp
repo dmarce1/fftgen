@@ -21,17 +21,29 @@ void print_fft(int N) {
 	std::string fname = "fft." + std::to_string(N) + ".cpp";
 	set_file(fname);
 	print("#include \"fft.hpp\"\n");
-	print("\nvoid fft_%i(std::complex<double>* x0) {\n", N);
+	print("\nvoid fft_base_%i(double* x) {\n", N);
 	indent();
 	for (int n = 0; n < NPAR; n++) {
 		print("double tmp%i;\n", n);
 	}
-	print("double* x = reinterpret_cast<double*>(x0);\n");
-	fft_bitreverse(N);
 	fft(N, 0, true);
-	fft_nops[N] = fft_opcnt(N, 0);
 	deindent();
 	print("}\n\n");
+	print("\nvoid fft_bitreverse_%i(double* x) {\n", N);
+	indent();
+	for (int n = 0; n < NPAR; n++) {
+		print("double tmp%i;\n", n);
+	}
+	fft_bitreverse(N);
+	deindent();
+	print("}\n\n");
+	print("\nvoid fft_%i(double* x) {\n", N);
+	indent();
+	print("fft_bitreverse_%i(x);\n", N);
+	print("fft_base_%i(x);\n", N);
+	deindent();
+	print("}\n\n");
+	fft_nops[N] = fft_opcnt(N, 0);
 }
 
 void print_fft_real(int N) {
@@ -174,6 +186,14 @@ int main(int argc, char **argv) {
 	print("%s\n", header51.c_str());
 	print("%s\n", header42.c_str());
 	print("%s\n", header52.c_str());
+	for (int n = 2; n <= MAXFFT; n += DFFT) {
+		print("void fft_%i(double*);\n", n);
+		print("void fft_base_%i(double*);\n", n);
+	}
+	for (int n = 2; n <= MAXFFT; n++) {
+		print("void fft_real_%i(double*, double*);\n", n);
+	}
+	print("\n");
 
 	set_file("fft.cpp");
 	print("#include \"fft.hpp\"\n\n");
@@ -207,16 +227,9 @@ int main(int argc, char **argv) {
 			"");
 
 	print("\n");
-	for (int n = 2; n <= MAXFFT; n += DFFT) {
-		print("void fft_%i(std::complex<double>*);\n", n);
-	}
-	for (int n = 2; n <= MAXFFT; n++) {
-		print("void fft_real_%i(double*, double*);\n", n);
-	}
-	print("\n");
 
 	print("typedef void (*func_real_type)(double*, double*);\n");
-	print("typedef void (*func_type)(std::complex<double>*);\n");
+	print("typedef void (*func_type)(double*);\n");
 	print("\n");
 	print("const func_type fptr[] = {nullptr, nullptr, ");
 	for (int n = 2; n <= MAXFFT; n++) {
