@@ -17,6 +17,7 @@
 int fft_nops_real[MAXFFT + 1];
 int fft_nops[MAXFFT + 1];
 
+
 void print_fft(int N) {
 	std::string fname = "fft." + std::to_string(N) + ".cpp";
 	set_file(fname);
@@ -50,14 +51,21 @@ void print_fft_real(int N) {
 	std::string fname = "fft.real." + std::to_string(N) + ".cpp";
 	set_file(fname);
 	print("#include \"fft.hpp\"\n");
-	print("\nvoid fft_real_%i(double* x0, double* y) {\n", N);
+	print("\nvoid fft_real_base_%i(double* x) {\n", N);
 	indent();
 	for (int n = 0; n < NPAR; n++) {
 		print("double tmp%i;\n", n);
 	}
-	print("double* x = reinterpret_cast<double*>(x0);\n");
-	fft_bitreverse_real(N);
-	fft_real(N, 0, true);
+	fft_real(N);
+	deindent();
+	print("}\n\n");
+
+	print("\nvoid fft_real_%i(double* x, double* y) {\n", N);
+	indent();
+	for (int n = 0; n < NPAR; n++) {
+		print("double tmp%i;\n", n);
+	}
+	print("fft_real_base_%i(x);\n", N);
 	print("y[%i] = x[%i];\n", 0, 0);
 	print("y[%i] = 0;\n", 1);
 	for (int n = 1; n < (N + 1) / 2; n++) {
@@ -68,13 +76,11 @@ void print_fft_real(int N) {
 		print("y[%i] = x[%i];\n", 2 * (N / 2), N / 2);
 		print("y[%i] = 0;\n", 2 * (N / 2) + 1);
 	}
-	fft_nops_real[N] = fft_real_opcnt(N, 0);
 	deindent();
 	print("}\n\n");
 }
 
 int main(int argc, char **argv) {
-
 	for (int n = 2; n <= MAXFFT; n += DFFT) {
 		print_fft(n);
 	}
@@ -187,8 +193,13 @@ int main(int argc, char **argv) {
 	print("%s\n", header42.c_str());
 	print("%s\n", header52.c_str());
 	for (int n = 2; n <= MAXFFT; n += DFFT) {
-		print("void fft_%i(double*);\n", n);
 		print("void fft_base_%i(double*);\n", n);
+	}
+	for (int n = 2; n <= MAXFFT; n += DFFT) {
+		print("void fft_real_base_%i(double*);\n", n);
+	}
+	for (int n = 2; n <= MAXFFT; n += DFFT) {
+		print("void fft_%i(double*);\n", n);
 	}
 	for (int n = 2; n <= MAXFFT; n++) {
 		print("void fft_real_%i(double*, double*);\n", n);
@@ -196,6 +207,7 @@ int main(int argc, char **argv) {
 	print("\n");
 
 	set_file("fft.cpp");
+	printf( "Hello World\n");
 	print("#include \"fft.hpp\"\n\n");
 
 	print("\n"
@@ -268,7 +280,7 @@ int main(int argc, char **argv) {
 
 	set_file("Makefile");
 	print("CC=g++\n");
-	//print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
+//	print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
 	print("CFLAGS=-I. -Ofast -march=native\n");
 	print("DEPS = fft.hpp\n");
 	print("OBJ = fft.o ");

@@ -20,7 +20,7 @@
 #define COOLEY 3
 #define MWEIGHT (1.5)
 constexpr int NPAR = 4;
-#define MAXFFT 64
+#define MAXFFT 128
 #define DFFT 1
 
 struct fft_type {
@@ -31,14 +31,13 @@ struct fft_type {
 	int nops;
 };
 
+
+void fft_real(int N);
 void indent();
 void deindent();
 FILE* get_fp();
 int get_ntabs();
-void gt2_fft_real(int N1, int N2, int o);
-void raders_fft_real_inv(int N, int o);
 void include(const char* name);
-void fft_complex_real(int N);
 void set_file(std::string str);
 std::complex<double> twiddle(int k, int N);
 std::string to_str(std::complex<double> z);
@@ -51,20 +50,12 @@ int generator(int N);
 const std::vector<std::complex<double>> twiddles(int N);
 int index(int o, int i, int j, int N);
 int index_real(int o, int i, int j, int N);
-int index_real_inv(int o, int i, int j, int N);
-void fft_bitreverse_real_inv(int N);
-std::vector<int> fft_bitreverse_indices_real_inv(int N);
-std::vector<int> fft_bitr_real_inv(int N, int o, std::vector<int> indices, bool first = false);
 void fftw(std::vector<std::complex<double>>& x);
 void fftw_real(std::vector<std::complex<double>>& xout, const std::vector<double>& xin);
 std::unordered_map<int, int> prime_fac(int N);
-std::vector<int> fft_bitr_real(int N, int o, std::vector<int> indices, bool first = false);
 void fft_radix(int r, int N, int o);
 std::vector<int> fft_radix_bitr(int r, int N, int o, std::vector<int> indices);
 std::vector<int> fft_bitreverse_indices(int N);
-std::vector<int> fft_radix_bitr_real(int r, int N, int o, std::vector<int> indices);
-std::vector<int> fft_radix_bitr_real(int r, int N, int o, std::vector<int> I);
-std::vector<int> fft_bitreverse_indices_real(int N);
 void gt2_fft(int N1, int N2, int o);
 int gt2_fft_opcnt(int N1, int N2);
 int gt3_fft_opcnt(int N1, int N2, int N3);
@@ -74,7 +65,6 @@ void fft(int N, int o, bool first = false);
 int fft_opcnt(int N, bool first = false);
 int fft_real_inv_opcnt(int N, int o);
 void fft_bitreverse(int N, std::vector<int> indices = std::vector<int>(), int o = 0);
-void fft_bitreverse_real(int N, std::vector<int> indices = std::vector<int>(), int o = 0);
 std::vector<int> raders_ginvq(int N);
 const std::vector<int> raders_gq(int N);
 const std::vector<std::complex<double>> raders_four_twiddle(int N);
@@ -82,19 +72,9 @@ void print_z(int zi, int xi, int k, int r, int N, int o);
 void raders_fft(int N, int o, bool padded = false);
 int raders_fft_opcnt( int N);
 int print_z_opcnt(int zi, int k, int r, int N);
-int fft_radix_real_opcnt(int r, int N, int o);
-fft_type best_radix_real(int N, int o, bool first = false);
-int fft_radix_real_opcnt(int r, int N, int o);
-void fft_radix_real(int r, int N, int o, bool = false);
-int fft_radix_real_opcnt(int r, int N, int o);
 fft_type best_radix(int N, int o, bool first = false);
 std::vector<int> gt2_fft_bitr(int N1, int N2, int o, std::vector<int> I);
 std::vector<int> fft_bitr(int N, int o, std::vector<int> indices, bool first = false);
-void fft_real(int N, int o, bool = false);
-int fft_real_opcnt(int N, int o);
-void fft_real_inv(int N, int o, bool = false);
-void raders_fft_real(int N, int o);
-int raders_fft_real_opcnt(int N, int o);
 
 template<class ... Args>
 void print(const char* fstr, Args ...args) {
