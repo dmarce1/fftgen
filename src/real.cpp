@@ -1,92 +1,76 @@
 #include "fftgen.hpp"
+#include <list>
+
+void fft_radix_real(int N1, int N2);
+int fft_radix_real_opcnt(int N1, int N2);
+std::vector<int> fft_bitreverse_indices_real(int N);
+
+std::vector<int> factors(int N) {
+	std::vector<int> f;
+	for (int N1 = 2; N1 <= N; N1++) {
+		if (N % N1 == 0) {
+			if (is_prime(N1) || N1 == 4 || N1 == 6) {
+				f.push_back(N1);
+			}
+		}
+	}
+	return f;
+}
+
+std::pair<int, int> best_radix_real(int N) {
+	const auto fs = factors(N);
+	int best_cnt = 999999999;
+	int best_radix;
+	for (int n = 0; n < fs.size(); n++) {
+		int cnt = fft_radix_real_opcnt(fs[n], N / fs[n]);
+		if (cnt < best_cnt) {
+			best_cnt = cnt;
+			best_radix = fs[n];
+		}
+	}
+	return std::make_pair(best_radix, best_cnt);
+}
 
 void fft_real(int N) {
-	int N1;
-	N1 = 1;
-	N1 = greatest_prime_factor(N);
-/*	if (N1 < 6 && N % 6 == 0) {
-		N1 = 6;
-	}
-	if (N1 < 4 && N % 4 == 0) {
-		N1 = 4;
-	}*/
+	int best = best_radix_real(N).first;
+	fft_radix_real(best, N / best);
+}
 
-	int N2 = N / N1;
+void fft_radix_real(int N1, int N2) {
+	int N = N1 * N2;
 	print("{\n");
 	indent();
 
-	print("std::array<std::array<double, %i>, %i> z0;\n", 2 * N2, N1 / 2);
-	if (N1 % 2 != 0) {
-		print("std::array<double, %i> z1;\n", N2);
-	}
-	for (int n2 = 0; n2 < N2; n2++) {
-		for (int n1 = 0; n1 < N1; n1 += 2) {
-			if (N1 - n1 == 1) {
-				break;
-			}
-			print("z0[%i][%i] = x[%i];\n", n1 / 2, 2 * n2, N1 * n2 + n1);
-			print("z0[%i][%i] = x[%i];\n", n1 / 2, 2 * n2 + 1, N1 * n2 + n1 + 1);
-		}
-		if (N1 % 2 != 0) {
-			const int n1 = N1 - 1;
-			print("z1[%i] = x[%i];\n", n2, N1 * n2 + n1);
-		}
-	}
 	if (N2 > 1) {
-		for (int n1 = 0; n1 < N1; n1 += 2) {
-			if (N1 - n1 == 1) {
-				break;
-			}
-			print("fft_%i(z0[%i].data());\n", N2, n1 / 2);
-		}
-		if (N1 % 2 != 0) {
-			print("fft_real_base_%i(z1.data());\n", N2);
+		for (int n1 = 0; n1 < N1; n1++) {
+			print("fft_real_base_%i(x + %i);\n", N2, N2 * n1);
 		}
 	}
-	for (int k2 = 0; k2 < N2 / 2 + 1; k2++) {
-		for (int n1 = 0; n1 < N1; n1 += 2) {
-			const int nkr0 = N2 * n1 + k2;
-			const int nkr1 = N2 * (n1 + 1) + k2;
-			const int nki0 = N2 * n1 + (N2 - k2);
-			const int nki1 = N2 * (n1 + 1) + (N2 - k2);
-			if (N1 - n1 == 1) {
-				break;
-			}
-			if (k2 == 0 || (k2 == N2 / 2 && N2 % 2 == 0)) {
-				print("x[%i] = z0[%i][%i];\n", nkr0, n1 / 2, 2 * k2);
-				print("x[%i] = z0[%i][%i];\n", nkr1, n1 / 2, 2 * k2 + 1);
-			} else {
-				print("x[%i] = 0.5 * (z0[%i][%i] + z0[%i][%i]);\n", nkr0, n1 / 2, 2 * k2, n1 / 2, 2 * (N2 - k2));
-				print("x[%i] = 0.5 * (z0[%i][%i] - z0[%i][%i]);\n", nki0, n1 / 2, 2 * k2 + 1, n1 / 2, 2 * (N2 - k2) + 1);
-				print("x[%i] = 0.5 * (z0[%i][%i] + z0[%i][%i]);\n", nkr1, n1 / 2, 2 * k2 + 1, n1 / 2, 2 * (N2 - k2) + 1);
-				print("x[%i] = 0.5 * (z0[%i][%i] - z0[%i][%i]);\n", nki1, n1 / 2, 2 * (N2 - k2), n1 / 2, 2 * k2);
-			}
-		}
-		if (N1 % 2 != 0) {
-			const int n1 = N1 - 1;
-			const int nkr = N2 * n1 + k2;
-			const int nki = N2 * n1 + N2 - k2;
-			if (k2 == 0 || (k2 == N2 / 2 && N2 % 2 == 0)) {
-				print("x[%i] = z1[%i];\n", nkr, k2);
-			} else if (k2 < N2 / 2 + 1) {
-				print("x[%i] = z1[%i];\n", nkr, k2);
-				print("x[%i] = z1[%i];\n", nki, N2 - k2);
-			}
-		}
-	}
+	int ipar = 0;
 	for (int k2 = 0; k2 < N2 / 2 + 1; k2++) {
 		for (int n1 = 0; n1 < N1; n1++) {
 			const int kr = N2 * n1 + k2;
 			const int ki = N2 * n1 + (N2 - k2);
 			const auto W = twiddle(n1 * k2, N);
 			if (k2 == 0) {
-
 			} else if (k2 == N2 / 2 && N2 % 2 == 0) {
-
 			} else {
-				print("tmp0 = x[%i];\n", kr);
-				print("x[%i] = x[%i] * %.17e + x[%i] * %.17e;\n", kr, kr, W.real(), ki, -W.imag());
-				print("x[%i] = x[%i] * %.17e + tmp0 * %.17e;\n", ki, ki, W.real(), W.imag());
+				if (n1 * k2 == 0) {
+				} else if (n1 * k2 == N / 2 && (N % 2 == 0)) {
+					print("x[%i] = -x[%i];\n", kr, kr);
+					print("x[%i] = -x[%i];\n", ki, ki);
+				} else if (n1 * k2 == N / 4 && (N % 4 == 0)) {
+					print("std::swap(x[%i], x[%i]);\n", kr, ki);
+					print("x[%i] = -x[%i];\n", ki, ki);
+				} else if (n1 * k2 == 3 * N / 4 && (N % 4 == 0)) {
+					print("std::swap(x[%i], x[%i]);\n", kr, ki);
+					print("x[%i] = -x[%i];\n", kr, kr);
+				} else {
+					print("tmp%i = x[%i];\n", ipar, kr);
+					print("x[%i] = std::fma(x[%i], %.17e, x[%i] * %.17e);\n", kr, kr, W.real(), ki, -W.imag());
+					print("x[%i] = std::fma(x[%i], %.17e, tmp%i * %.17e);\n", ki, ki, W.real(), ipar, W.imag());
+					ipar = (ipar + 1) % NPAR;
+				}
 			}
 		}
 	}
@@ -435,12 +419,12 @@ void fft_real(int N) {
 			print("const auto t3 = x2 - x3;\n");
 			print("const auto t4 = x2 + x3;\n");
 			print("const auto t5 = t1 - t3;\n");
-			print("const auto t6 = x0 + 0.25 * t5;\n");
+			print("const auto t6 = std::fma(0.25, t5, x0);\n");
 			print("const auto t7 = (%.17e) * (t1 + t3);\n", sqrt(5) * 0.25);
 			print("x[%i] = t6 + t7;\n", k2);
-			print("x[%i] = (%.17e) * t2 + (%.17e) * t4;\n", N - k2, -sin(2.0 * M_PI / 10.0), -sin(2.0 * M_PI / 5.0));
+			print("x[%i] = std::fma((%.17e), t2, (%.17e) * t4);\n", N - k2, -sin(2.0 * M_PI / 10.0), -sin(2.0 * M_PI / 5.0));
 			print("x[%i] = t6 - t7;\n", N2 + k2);
-			print("x[%i] = (%.17e) * t2 + (%.17e) * t4;\n", N - (N2 + k2), -sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
+			print("x[%i] = std::fma((%.17e), t2, (%.17e) * t4);\n", N - (N2 + k2), -sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
 			print("x[%i] = x0 - t5;\n", 2 * N2 + k2);
 			break;
 		case 6:
@@ -452,8 +436,8 @@ void fft_real(int N) {
 			print("const auto t2 = (%.17e) * (x2 + x4);\n", sin(M_PI / 3.0));
 			print("const auto t3 = x2 - x4;\n");
 			print("const auto t4 = x1 + x5;\n");
-			print("const auto t5 = x0 + 0.5 * t3;\n");
-			print("const auto t6 = -x3 - 0.5 * t4;\n");
+			print("const auto t5 = std::fma(0.5, t3, x0);\n");
+			print("const auto t6 = -std::fma(0.5, t4, x3);\n");
 			print("x[%i] = t5 - t1;\n", k2);
 			print("x[%i] = t6 - t2;\n", N - k2);
 			print("x[%i] = x0 - t3;\n", N2 + k2);
@@ -524,4 +508,272 @@ void fft_real(int N) {
 	deindent();
 	print("}\n");
 
+}
+
+int fft_real_opcnt(int N) {
+	int best = best_radix_real(N).first;
+	return fft_radix_real_opcnt(best, N / best);
+}
+
+int fft_radix_real_opcnt(int N1, int N2) {
+	int N = N1 * N2;
+	int cnt = 0;
+	if (N2 > 1) {
+		for (int n1 = 0; n1 < N1; n1++) {
+			cnt += fft_real_opcnt(N2);
+		}
+	}
+	for (int k2 = 0; k2 < N2 / 2 + 1; k2++) {
+		for (int n1 = 0; n1 < N1; n1++) {
+			const int kr = N2 * n1 + k2;
+			const int ki = N2 * n1 + (N2 - k2);
+			const auto W = twiddle(n1 * k2, N);
+			if (k2 == 0) {
+			} else if (k2 == N2 / 2 && N2 % 2 == 0) {
+			} else {
+				if (n1 * k2 == 0) {
+				} else if (n1 * k2 == N / 2 && (N % 2 == 0)) {
+					cnt += 2;
+				} else if (n1 * k2 == N / 4 && (N % 4 == 0)) {
+					cnt++;
+				} else if (n1 * k2 == 3 * N / 4 && (N % 4 == 0)) {
+					cnt++;
+				} else {
+					cnt += 4;
+				}
+			}
+		}
+	}
+	switch (N1) {
+	case 2:
+		cnt += 2;
+		break;
+	case 3:
+		cnt += 6;
+		break;
+	case 4:
+		cnt += 8;
+		break;
+	case 5:
+		cnt += 17;
+		break;
+	case 6:
+		cnt += 17;
+		break;
+
+	default:
+		for (int j = 1; j <= (N1 - 1) / 2; j++) {
+			cnt += 2;
+		}
+		for (int i = 1; i <= (N1 - 1) / 2; i++) {
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				cnt += 2;
+			}
+		}
+		for (int i = 1; i < N1; i++) {
+			cnt++;
+		}
+		for (int i = 1; i <= (N1 - 1) / 2; i++) {
+			if (N - i * N2 != i * N2) {
+				cnt++;
+			}
+			if (N - (N1 - i) * N2 != (N1 - i) * N2) {
+				cnt++;
+			}
+		}
+	}
+
+	switch (N1) {
+	case 2:
+		cnt += 4;
+		break;
+	case 3:
+		cnt += 15;
+		break;
+	case 4:
+		cnt += 16;
+		break;
+	case 5:
+		cnt += 40;
+		break;
+	case 6:
+		cnt += 43;
+		break;
+	default:
+		for (int j = 1; j <= (N1 - 1) / 2; j++) {
+			cnt += 4;
+		}
+		for (int i = 1; i <= (N1 - 1) / 2; i++) {
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				cnt += 4;
+			}
+		}
+		for (int i = 1; i < N1; i++) {
+			cnt += 2;
+		}
+		for (int i = 1; i <= (N1 - 1) / 2; i++) {
+			cnt += 5;
+		}
+	}
+	if (N2 % 2 == 0) {
+
+		int k2 = N2 / 2;
+
+		switch (N1) {
+		case 2:
+			cnt++;
+			break;
+		case 3:
+			cnt += 5;
+			break;
+		case 4:
+			cnt += 9;
+			break;
+		case 5:
+			cnt += 15;
+			break;
+		case 6:
+			cnt += 15;
+			break;
+
+		default:
+			for (int n1 = 1; n1 < N1; n1++) {
+				cnt += 2;
+			}
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				cnt += 4;
+			}
+			for (int i = 1; i <= (N1 - 1) / 2; i++) {
+				for (int j = 1; j <= (N1 - 1) / 2; j++) {
+					cnt += 4;
+				}
+			}
+			for (int i = 1; i < N1; i++) {
+				cnt++;
+			}
+			for (int i = 2; i < N1; i++) {
+				cnt++;
+			}
+			for (int i = 1; i <= (N1 - 1) / 2; i++) {
+				if (i == (N1 - 1) / 2) {
+					cnt++;
+				} else {
+					cnt++;
+					cnt++;
+				}
+			}
+		}
+	}
+	return cnt;
+
+}
+
+std::vector<int> fft_bitr_real(int N, int o, std::vector<int> I);
+
+std::vector<int> fft_bitreverse_indices_real(int N) {
+	std::vector<int> I;
+	std::vector<int> indices;
+	I.resize(0);
+	for (int n = 0; n < N; n++) {
+		I.push_back(n);
+	}
+	indices = fft_bitr_real(N, 0, I);
+	return indices;
+}
+
+std::vector<int> fft_bitr_real(int N, int o, std::vector<int> I) {
+	if (N == 1) {
+		return I;
+	}
+	std::vector<int> L;
+	std::vector<int> J;
+	std::vector<int> K;
+	int r = best_radix_real(N).first;
+	for (int n = 0; n < r; n++) {
+		std::vector<int> J;
+		for (int k = 0; k < N / r; k++) {
+			J.push_back(I[n + r * k]);
+		}
+		auto K = fft_bitr_real(N / r, o + n * N / r, J);
+		L.insert(L.end(), K.begin(), K.end());
+	}
+	return L;
+}
+
+void fft_bitreverse_real(int N, std::vector<int> indices, int o) {
+	if (indices.size() == 0) {
+		indices = fft_bitreverse_indices_real(N);
+//		indices = reverse_indices(indices);
+	}
+	std::vector<std::list<int>> strings;
+	std::vector<bool> touched(N, false);
+	for (int k = 0; k < N; k++) {
+		if (!touched[k]) {
+			std::list<int> string;
+			int current = k;
+			int first = current;
+			int next = indices[current];
+			touched[current] = true;
+			if (first != next) {
+				string.push_back(-1);
+				string.push_back(index_real(o, current, 0, N));
+				while (first != next) {
+					string.push_back(index_real(o, next, 0, N));
+					current = next;
+					touched[current] = true;
+					next = indices[next];
+				}
+			}
+			strings.push_back(string);
+		}
+	}
+	int n = 0;
+	std::vector<std::vector<std::string>> cmds(NPAR);
+	while (n < strings.size()) {
+		int smallest = 9999999999, smalli;
+		for (int i = 0; i < NPAR; i++) {
+			if (cmds[i].size() < smallest) {
+				smallest = cmds[i].size();
+				smalli = i;
+			}
+		}
+		std::vector<std::string> cmd;
+		char* buf;
+		while (strings[n].size()) {
+			if (strings[n].front() == -1) {
+				strings[n].pop_front();
+				if (strings[n].size()) {
+					asprintf(&buf, "tmp%i = x[%i];\n", smalli, strings[n].front());
+					cmd.push_back(buf);
+					free(buf);
+				}
+			} else {
+				int to = strings[n].front();
+				strings[n].pop_front();
+				if (strings[n].size()) {
+					asprintf(&buf, "x[%i] = x[%i];\n", to, strings[n].front());
+					cmd.push_back(buf);
+					free(buf);
+				} else {
+					asprintf(&buf, "x[%i] = tmp%i;\n", to, smalli);
+					cmd.push_back(buf);
+					free(buf);
+				}
+			}
+		}
+		cmds[smalli].insert(cmds[smalli].end(), cmd.begin(), cmd.end());
+		n++;
+	}
+	n = 0;
+	bool done = false;
+	while (!done) {
+		done = true;
+		for (int j = 0; j < NPAR; j++) {
+			if (cmds[j].size() > n) {
+				print("%s", cmds[j][n].c_str());
+				done = false;
+			}
+		}
+		n++;
+	}
 }

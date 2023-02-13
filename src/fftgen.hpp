@@ -65,6 +65,7 @@ void fft(int N, int o, bool first = false);
 int fft_opcnt(int N, bool first = false);
 int fft_real_inv_opcnt(int N, int o);
 void fft_bitreverse(int N, std::vector<int> indices = std::vector<int>(), int o = 0);
+void fft_bitreverse_real(int N, std::vector<int> indices = std::vector<int>(), int o = 0);
 std::vector<int> raders_ginvq(int N);
 const std::vector<int> raders_gq(int N);
 const std::vector<std::complex<double>> raders_four_twiddle(int N);

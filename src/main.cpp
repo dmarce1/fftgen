@@ -65,6 +65,7 @@ void print_fft_real(int N) {
 	for (int n = 0; n < NPAR; n++) {
 		print("double tmp%i;\n", n);
 	}
+	fft_bitreverse_real(N);
 	print("fft_real_base_%i(x);\n", N);
 	print("y[%i] = x[%i];\n", 0, 0);
 	print("y[%i] = 0;\n", 1);
