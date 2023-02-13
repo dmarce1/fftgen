@@ -3,11 +3,9 @@
 void fft_real(int N) {
 	int N1;
 	N1 = 1;
-	while (!(N % N1 == 0 && is_prime(N1))) {
-		N1++;
-	}
+	N1 = greatest_prime_factor(N);
 /*	if (N1 < 6 && N % 6 == 0) {
-	//	N1 = 6;
+		N1 = 6;
 	}
 	if (N1 < 4 && N % 4 == 0) {
 		N1 = 4;
@@ -97,7 +95,6 @@ void fft_real(int N) {
 	for (int k1 = 0; k1 < N1; k1++) {
 		const int kr = N2 * k1;
 		print("const auto zr%i = x[%i];\n", k1, kr);
-		print("constexpr double zi%i = 0;\n", k1);
 	}
 	switch (N1) {
 	case 1:
@@ -163,10 +160,10 @@ void fft_real(int N) {
 		print("const auto ti12 = tr6;\n");
 		print("x[%i] = tr7 + tr10;\n", 0);
 		print("x[%i] = tr8 - tr11;\n", N2);
-		print("x[%i] = ti8 - ti11;\n", N - (N2));
+		print("x[%i] = ti8 - ti11;\n", N - N2);
 		print("x[%i] = tr9 + tr12;\n", 2 * N2);
-		print("x[%i] = ti9 + ti12;\n", N - (2 * N2));
-		print("x[%i] = tr7 - tr10;\n", N - (3 * N2));
+		print("x[%i] = ti9 + ti12;\n", N - 2 * N2);
+		print("x[%i] = tr7 - tr10;\n", 3 * N2);
 
 		break;
 
@@ -327,17 +324,17 @@ void fft_real(int N) {
 			print("const auto ti11 = ti5 - tr6;\n");
 			print("const auto tr12 = tr5 - ti6;\n");
 			print("const auto ti12 = ti5 + tr6;\n");
-			print("x[%i] = tr7 + tr10;\n", 0);
-			print("x[%i] = tr8 - tr11;\n", N2 + k2);
-			print("x[%i] = tr9 + tr12;\n", 2 * N2 + k2);
-			print("x[%i] = tr7 - tr10;\n", N - (3 * N2 + k2));
-			print("x[%i] = tr8 + tr11;\n", N - (4 * N2 + k2));
-			print("x[%i] = tr9 - tr12;\n", N - (5 * N2 + k2));
+			print("x[%i] = tr7 + tr10;\n", k2);
 			print("x[%i] = ti7 + ti10;\n", N - k2);
+			print("x[%i] = tr8 - tr11;\n", N2 + k2);
 			print("x[%i] = ti8 - ti11;\n", N - (N2 + k2));
+			print("x[%i] = tr9 + tr12;\n", 2 * N2 + k2);
 			print("x[%i] = ti9 + ti12;\n", N - (2 * N2 + k2));
+			print("x[%i] = tr7 - tr10;\n", N - (3 * N2 + k2));
 			print("x[%i] = -ti7 + ti10;\n", 3 * N2 + k2);
+			print("x[%i] = tr8 + tr11;\n", N - (4 * N2 + k2));
 			print("x[%i] = -ti8 - ti11;\n", 4 * N2 + k2);
+			print("x[%i] = tr9 - tr12;\n", N - (5 * N2 + k2));
 			print("x[%i] = -ti9 + ti12;\n", 5 * N2 + k2);
 			break;
 		default:
@@ -394,25 +391,33 @@ void fft_real(int N) {
 		int k2 = N2 / 2;
 		print("{\n");
 		indent();
-		for (int k1 = 0; k1 < N1; k1++) {
-			const int kr = N2 * k1 + k2;
-			print("const auto x%i = x[%i];\n", k1, kr);
-		}
 
 		switch (N1) {
 		case 1:
 			return;
 		case 2:
+			for (int k1 = 0; k1 < N1; k1++) {
+				const int kr = N2 * k1 + k2;
+				print("const auto x%i = x[%i];\n", k1, kr);
+			}
 			print("x[%i] = x0;\n", k2);
 			print("x[%i] = -x1;\n", N - k2);
 			break;
 		case 3:
+			for (int k1 = 0; k1 < N1; k1++) {
+				const int kr = N2 * k1 + k2;
+				print("const auto x%i = x[%i];\n", k1, kr);
+			}
 			print("const auto t1 = x1 - x2;\n");
 			print("x[%i] = x0 + 0.5 * t1;\n", k2);
-			print("x[%i] = x0 - t1;\n", N - k2);
-			print("x[%i] = (%.17e) * (x1 + x2);\n", N2 + k2, -sin(M_PI / 3.0));
+			print("x[%i] = x0 - t1;\n", N2 + k2);
+			print("x[%i] = (%.17e) * (x1 + x2);\n", N - k2, -sin(M_PI / 3.0));
 			break;
 		case 4:
+			for (int k1 = 0; k1 < N1; k1++) {
+				const int kr = N2 * k1 + k2;
+				print("const auto x%i = x[%i];\n", k1, kr);
+			}
 			print("const auto t1 = (x1 - x3) * (%.17e);\n", 1.0 / sqrt(2));
 			print("const auto t2 = (x1 + x3) * (%.17e);\n", 1.0 / sqrt(2));
 			print("x[%i] = x0 + t1;\n", k2);
@@ -421,6 +426,10 @@ void fft_real(int N) {
 			print("x[%i] = x2 - t2;\n", N - (N2 + k2));
 			break;
 		case 5:
+			for (int k1 = 0; k1 < N1; k1++) {
+				const int kr = N2 * k1 + k2;
+				print("const auto x%i = x[%i];\n", k1, kr);
+			}
 			print("const auto t1 = x1 - x4;\n");
 			print("const auto t2 = x1 + x4;\n");
 			print("const auto t3 = x2 - x3;\n");
@@ -435,19 +444,77 @@ void fft_real(int N) {
 			print("x[%i] = x0 - t5;\n", 2 * N2 + k2);
 			break;
 		case 6:
+			for (int k1 = 0; k1 < N1; k1++) {
+				const int kr = N2 * k1 + k2;
+				print("const auto x%i = x[%i];\n", k1, kr);
+			}
 			print("const auto t1 = (%.17e) * (x5 - x1);\n", sin(M_PI / 3.0));
 			print("const auto t2 = (%.17e) * (x2 + x4);\n", sin(M_PI / 3.0));
 			print("const auto t3 = x2 - x4;\n");
 			print("const auto t4 = x1 + x5;\n");
 			print("const auto t5 = x0 + 0.5 * t3;\n");
 			print("const auto t6 = -x3 - 0.5 * t4;\n");
-			print("x[%i] = t5 - t1;\n", 0);
+			print("x[%i] = t5 - t1;\n", k2);
 			print("x[%i] = t6 - t2;\n", N - k2);
 			print("x[%i] = x0 - t3;\n", N2 + k2);
 			print("x[%i] = x3 - t4;\n", N - (N2 + k2));
 			print("x[%i] = t5 + t1;\n", 2 * N2 + k2);
 			print("x[%i] = t6 + t2;\n", N - (2 * N2 + k2));
 			break;
+
+		default:
+			print("const auto zr0 = x[%i];\n", k2);
+			for (int n1 = 1; n1 < N1; n1++) {
+				const int kr = N2 * n1 + k2;
+				const auto W = twiddle(n1 * k2, N);
+				print("const auto zr%i = x[%i] * (%.17e);\n", n1, kr, W.real());
+				print("const auto zi%i = x[%i] * (%.17e);\n", n1, kr, W.imag());
+			}
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				print("const auto txp%i = zr%i + zr%i;\n", j, j, N1 - j);
+			}
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				print("const auto txm%i = zr%i - zr%i;\n", j, j, N1 - j);
+			}
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				print("const auto typ%i = zi%i + zi%i;\n", j, j, N1 - j);
+			}
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				print("const auto tym%i = zi%i - zi%i;\n", j, j, N1 - j);
+			}
+			for (int i = 1; i <= (N1 - 1) / 2; i++) {
+				print("auto ap%i = zr0;\n", i);
+				for (int j = 1; j <= (N1 - 1) / 2; j++) {
+					print("ap%i = std::fma(txp%i, (%24.17e), ap%i);\n", i, j, cos(2.0 * M_PI * j * i / N1), i);
+					if (j == 1) {
+						print("double bp%i = typ%i * (%24.17e);\n", i, j, cos(2.0 * M_PI * j * i / N1));
+						print("double am%i = tym%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N1));
+						print("double bm%i = txm%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N1));
+					} else {
+						print("bp%i = std::fma(typ%i, (%24.17e), bp%i);\n", i, j, cos(2.0 * M_PI * j * i / N1), i);
+						print("am%i = std::fma(tym%i, (%24.17e), am%i);\n", i, j, sin(2.0 * M_PI * j * i / N1), i);
+						print("bm%i = std::fma(txm%i, (%24.17e), bm%i);\n", i, j, sin(2.0 * M_PI * j * i / N1), i);
+					}
+				}
+			}
+			print("x[%i] = ", k2);
+			for (int i = 0; i < N1; i++) {
+				print_notab(" + zr%i", i);
+			}
+			print_notab(";\n");
+			print("x[%i] = ", N - k2);
+			for (int i = 1; i < N1; i++) {
+				print_notab(" + zi%i", i);
+			}
+			print_notab(";\n");
+			for (int i = 1; i <= (N1 - 1) / 2; i++) {
+				if (i == (N1 - 1) / 2) {
+					print("x[%i] = ap%i + am%i;\n", k2 + i * N2, i, i);
+				} else {
+					print("x[%i] = ap%i + am%i;\n", k2 + i * N2, i, i);
+					print("x[%i] = bp%i - bm%i;\n", N - (k2 + i * N2), i, i);
+				}
+			}
 		}
 		deindent();
 		print("}\n");
