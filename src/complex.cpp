@@ -289,7 +289,7 @@ std::vector<int> fft_bitr(int N, int o, std::vector<int> indices, bool first) {
 	if (N == 1) {
 		return indices;
 	}
-	auto fftt = best_radix(N, o, first);
+	auto fftt = best_radix(N, o);
 	if (fftt.type == RADIX) {
 		return fft_radix_bitr(fftt.N1, N, o, indices);
 	} else if (fftt.type == GOOD) {
@@ -576,7 +576,7 @@ void fft_radix_dit(int r, int N, int o) {
 	print("}\n");
 }
 
-fft_type best_radix(int N, int o, bool first) {
+fft_type best_radix(int N, int o) {
 	fft_type fftt;
 	int best_cnt = 999999999;
 	int best_radix = -1;
@@ -585,9 +585,6 @@ fft_type best_radix(int N, int o, bool first) {
 			int this_cnt;
 			if (r <= 6 || is_prime(r)) {
 				this_cnt = fft_radix_opcnt(r, N);
-				if (first) {
-					this_cnt += N * MWEIGHT;
-				}
 				if (this_cnt < best_cnt) {
 					best_cnt = this_cnt;
 					fftt.N1 = r;
@@ -620,9 +617,6 @@ fft_type best_radix(int N, int o, bool first) {
 				arrow = -arrow;
 			}
 			int gt_cnt = gt2_fft_opcnt(N1, N2);
-			if (first) {
-				gt_cnt += N * MWEIGHT;
-			}
 			if (gt_cnt < best_cnt) {
 				fftt.type = GOOD;
 				fftt.N1 = N1;
@@ -636,15 +630,15 @@ fft_type best_radix(int N, int o, bool first) {
 }
 
 int fft_opcnt(int N, bool first) {
-	auto i = best_radix(N, 0, first);
+	auto i = best_radix(N, 0);
 	return i.nops;
 }
 
-void fft(int N, int o, bool first) {
+void fft(int N, int o) {
 	if (N == 1) {
 		return;
 	}
-	auto fftt = best_radix(N, o, first);
+	auto fftt = best_radix(N, o);
 	if (fftt.type == RADIX) {
 		fft_radix(fftt.N1, N, o);
 	}

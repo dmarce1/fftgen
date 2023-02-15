@@ -17,19 +17,20 @@
 int fft_nops_real[MAXFFT + 1];
 int fft_nops[MAXFFT + 1];
 
-
 void print_fft(int N) {
 	std::string fname = "fft." + std::to_string(N) + ".cpp";
 	set_file(fname);
 	print("#include \"fft.hpp\"\n");
+
 	print("\nvoid fft_base_%i(double* x) {\n", N);
 	indent();
 	for (int n = 0; n < NPAR; n++) {
 		print("double tmp%i;\n", n);
 	}
-	fft(N, 0, true);
+	fft(N, 0);
 	deindent();
 	print("}\n\n");
+
 	print("\nvoid fft_bitreverse_%i(double* x) {\n", N);
 	indent();
 	for (int n = 0; n < NPAR; n++) {
@@ -38,13 +39,31 @@ void print_fft(int N) {
 	fft_bitreverse(N);
 	deindent();
 	print("}\n\n");
+
 	print("\nvoid fft_%i(double* x) {\n", N);
 	indent();
 	print("fft_bitreverse_%i(x);\n", N);
 	print("fft_base_%i(x);\n", N);
 	deindent();
 	print("}\n\n");
+
+	print("\nconst std::vector<int>& fft_permutation_indices_%i() {\n", N);
+	indent();
+	auto I = fft_bitreverse_indices(N);
+	print("static std::vector<int> indices({");
+	for (int i = 0; i < I.size(); i++) {
+		print_notab("%i", I[i]);
+		if (i != I.size() - 1) {
+			print_notab(", ");
+		} else {
+			print_notab("});\n");
+		}
+	}
+	print("return indices;\n");
+	deindent();
+	print("}\n\n");
 	fft_nops[N] = fft_opcnt(N, 0);
+
 }
 
 void print_fft_real(int N) {
@@ -197,6 +216,9 @@ int main(int argc, char **argv) {
 		print("void fft_base_%i(double*);\n", n);
 	}
 	for (int n = 2; n <= MAXFFT; n += DFFT) {
+		print("const std::vector<int>& fft_permutation_indices_%i();\n", n);
+	}
+	for (int n = 2; n <= MAXFFT; n += DFFT) {
 		print("void fft_real_base_%i(double*);\n", n);
 	}
 	for (int n = 2; n <= MAXFFT; n += DFFT) {
@@ -208,7 +230,7 @@ int main(int argc, char **argv) {
 	print("\n");
 
 	set_file("fft.cpp");
-	printf( "Hello World\n");
+	printf("Hello World\n");
 	print("#include \"fft.hpp\"\n\n");
 
 	print("\n"
@@ -243,10 +265,19 @@ int main(int argc, char **argv) {
 
 	print("typedef void (*func_real_type)(double*, double*);\n");
 	print("typedef void (*func_type)(double*);\n");
+	print("typedef const std::vector<int>& (*pfunc_type)() ;\n");
 	print("\n");
 	print("const func_type fptr[] = {nullptr, nullptr, ");
 	for (int n = 2; n <= MAXFFT; n++) {
 		print_notab("&fft_%i", n);
+		if (n != MAXFFT) {
+			print_notab(", ");
+		}
+	}
+	print_notab("};\n\n");
+	print("const pfunc_type pfptr[] = {nullptr, nullptr, ");
+	for (int n = 2; n <= MAXFFT; n++) {
+		print_notab("&fft_permutation_indices_%i", n);
 		if (n != MAXFFT) {
 			print_notab(", ");
 		}
@@ -281,7 +312,7 @@ int main(int argc, char **argv) {
 
 	set_file("Makefile");
 	print("CC=g++\n");
-//	print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
+//	print("CFLAGS=-I. -fsanitize=address -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
 	print("CFLAGS=-I. -Ofast -march=native\n");
 	print("DEPS = fft.hpp\n");
 	print("OBJ = fft.o ");
