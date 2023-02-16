@@ -131,6 +131,177 @@ void fftw(std::vector<std::complex<double>>& x) {
 
 }
 
+void fftw_dct(std::vector<double>& x) {
+	const int N = x.size();
+	static std::unordered_map<int, fftw_plan> plans;
+	static std::unordered_map<int, double*> in;
+	static std::unordered_map<int, double*> out;
+	if (plans.find(N) == plans.end()) {
+		in[N] = (double*) malloc(sizeof(double) * N);
+		out[N] = (double*) malloc(sizeof(double) * N);
+		plans[N] = fftw_plan_r2r_1d(N, in[N], out[N], FFTW_REDFT10, FFTW_ESTIMATE);
+	}
+	auto* i = in[N];
+	auto* o = out[N];
+	for (int n = 0; n < N; n++) {
+		i[n] = x[n];
+	}
+	fftw_execute(plans[N]);
+	for (int n = 0; n < N; n++) {
+		x[n] = (o[n]);
+	}
+
+}
+
+void FCT(std::vector<double>& x) {
+	int N = x.size();
+	std::vector<double> y(N);
+	std::vector<std::complex<double>> Y(N);
+	int M = N / 4;
+	if (N % 4 == 1) {
+		for (int n = 0; n <= (N - 1) / 2; n++) {
+			y[(n - M + N) % N] = x[2 * n];
+		}
+		for (int n = 0; n <= (N - 3) / 2; n++) {
+			y[(3 * M - n + N) % N] = x[2 * n + 1];
+		}
+	} else if (N % 4 == 3) {
+		for (int n = 0; n <= (N - 3) / 2; n++) {
+			y[(n - M + N) % N] = x[2 * n + 1];
+		}
+		for (int n = 0; n <= (N - 1) / 2; n++) {
+			y[(3 * M - n + N + 2) % N] = x[2 * n];
+		}
+	} else {
+		for (int n = 0; n < N / 2; n++) {
+			y[n] = x[2 * n];
+			y[N - 1 - n] = x[2 * n + 1];
+		}
+	}
+	FFT_real(Y.data(), y.data(), N);
+	if (N % 2 == 1) {
+		for (int n = 0; n <= (N - 1) / 2; n++) {
+			double sgn = (n / 2) % 2 == 0 ? 1.0 : -1.0;
+			if (n % 2 == 1) {
+				x[n] = 2 * sgn * Y[n].imag();
+			} else {
+				x[n] = 2 * sgn * Y[n].real();
+			}
+		}
+		for (int n = 1; n <= (N - 1) / 2; n++) {
+			double sgn = ((n + 1) / 2) % 2 == 0 ? -1.0 : +1.0;
+			if (N % 4 == 3) {
+				sgn = -sgn;
+			}
+			if (n % 2 == 0) {
+				x[N - n] = 2 * sgn * Y[n].imag();
+			} else {
+				x[N - n] = 2 * sgn * Y[n].real();
+			}
+		}
+	} else {
+		for (int k = 0; k < N / 2; k++) {
+			x[k] = 2.0 * (Y[k].real() * cos(0.5 * M_PI * k / N) + Y[k].imag() * sin(0.5 * M_PI * k / N));
+		}
+		for (int k = N / 2; k < N; k++) {
+			x[k] = 2.0 * (Y[N - k].real() * cos(0.5 * M_PI * k / N) - Y[N - k].imag() * sin(0.5 * M_PI * k / N));
+		}
+	}
+}
+
+void FCT_inv(std::vector<double>& x) {
+	int N = x.size();
+	std::vector<double> y(N);
+	std::vector<std::complex<double>> Y(N);
+	int M = N / 4;
+	if (N % 2 == 1) {
+		for (int n = 0; n <= (N - 1) / 2; n++) {
+			double sgn = (n / 2) % 2 == 0 ? 1.0 : -1.0;
+			if (n % 2 == 1) {
+				x[n] = 2 * sgn * Y[n].imag();
+			} else {
+				x[n] = 2 * sgn * Y[n].real();
+			}
+		}
+		for (int n = 1; n <= (N - 1) / 2; n++) {
+			double sgn = ((n + 1) / 2) % 2 == 0 ? -1.0 : +1.0;
+			if (N % 4 == 3) {
+				sgn = -sgn;
+			}
+			if (n % 2 == 0) {
+				x[N - n] = 2 * sgn * Y[n].imag();
+			} else {
+				x[N - n] = 2 * sgn * Y[n].real();
+			}
+		}
+	} else {
+		for (int k = 0; k < N / 2; k++) {
+			x[k] = 2.0 * (Y[k].real() * cos(0.5 * M_PI * k / N) + Y[k].imag() * sin(0.5 * M_PI * k / N));
+		}
+		for (int k = N / 2; k < N; k++) {
+			x[k] = 2.0 * (Y[N - k].real() * cos(0.5 * M_PI * k / N) - Y[N - k].imag() * sin(0.5 * M_PI * k / N));
+		}
+	}
+	FFT_real(Y.data(), y.data(), N);
+	if (N % 4 == 1) {
+		for (int n = 0; n <= (N - 1) / 2; n++) {
+			y[(n - M + N) % N] = x[2 * n];
+		}
+		for (int n = 0; n <= (N - 3) / 2; n++) {
+			y[(3 * M - n + N) % N] = x[2 * n + 1];
+		}
+	} else if (N % 4 == 3) {
+		for (int n = 0; n <= (N - 3) / 2; n++) {
+			y[(n - M + N) % N] = x[2 * n + 1];
+		}
+		for (int n = 0; n <= (N - 1) / 2; n++) {
+			y[(3 * M - n + N + 2) % N] = x[2 * n];
+		}
+	} else {
+		for (int n = 0; n < N / 2; n++) {
+			y[n] = x[2 * n];
+			y[N - 1 - n] = x[2 * n + 1];
+		}
+	}
+}
+
+void FST(std::vector<double>& x) {
+	int N = x.size();
+	for (int n = 0; n < N / 2; n++) {
+		std::swap(x[n], x[N - n - 1]);
+	}
+	for (int n = 1; n < N; n += 2) {
+		x[n] = -x[n];
+	}
+	FCT(x);
+	for (int n = 0; n < N / 2; n++) {
+		std::swap(x[n], x[N - n - 1]);
+	}
+	for (int n = 1; n < N; n += 2) {
+		x[n] = -x[n];
+	}
+}
+void fftw_dst(std::vector<double>& x) {
+	const int N = x.size();
+	static std::unordered_map<int, fftw_plan> plans;
+	static std::unordered_map<int, double*> in;
+	static std::unordered_map<int, double*> out;
+	if (plans.find(N) == plans.end()) {
+		in[N] = (double*) malloc(sizeof(double) * N);
+		out[N] = (double*) malloc(sizeof(double) * N);
+		plans[N] = fftw_plan_r2r_1d(N, in[N], out[N], FFTW_RODFT10, FFTW_ESTIMATE);
+	}
+	auto* i = in[N];
+	auto* o = out[N];
+	for (int n = 0; n < N; n++) {
+		i[n] = x[n];
+	}
+	fftw_execute(plans[N]);
+	for (int n = 0; n < N; n++) {
+		x[n] = (o[n]);
+	}
+
+}
 void fftw_real(std::vector<std::complex<double>>& xout, const std::vector<double>& xin) {
 	const int N = xin.size();
 	static std::unordered_map<int, fftw_plan> plans;
@@ -179,6 +350,16 @@ void fftw_real_inv(const std::vector<std::complex<double>>& xout, std::vector<do
 		xin[n] = i[n];
 	}
 
+}
+
+void fftw_skew(std::vector<std::complex<double>>& xout, const std::vector<double>& xin) {
+	int N = xin.size();
+	for (int k = 0; k < N; k++) {
+		xout[k] = std::complex<double>(0);
+		for (int n = 0; n < N; n++) {
+			xout[k] += xin[n] * std::polar(1.0, -2.0 * M_PI * k * (n + 0.5) / N);
+		}
+	}
 }
 
 void good_thomas(int N1, int N2, std::vector<std::complex<double>>& X) {
@@ -255,12 +436,58 @@ void good_thomas(int N1, int N2, std::vector<std::complex<double>>& X, std::vect
 	}
 }
 
+
+
 double rand1() {
 	return (rand() + 0.5) / RAND_MAX;
 }
 
 void test() {
 	timer tm3, tm4;
+
+	timer tm1, tm2;
+	double err;
+	double max;
+	/*for (int N = 2; N < 8; N++) {
+	 for (int ti = 0; ti < 1; ti++) {
+	 err = 0.0;
+	 max = 0.0;
+	 std::vector<std::complex<double>> X(N);
+	 std::vector<std::complex<double>> Y(N);
+	 std::vector<double> x(N);
+	 std::vector<double> y(N);
+	 std::vector<double> yr(N);
+	 std::vector<double> yi(N);
+	 for (int n = 0; n < N; n++) {
+	 x[n] = double(rand1());
+	 }
+	 yr = yi = y = x;
+
+	 tm1.start();
+	 tm3.start();
+	 FCT(yr);
+	 FST(yi);
+	 tm1.stop();
+	 tm3.stop();
+	 tm2.start();
+	 tm4.start();
+	 fftw_skew(Y, y);
+	 tm2.stop();
+	 tm4.stop();
+	 for (int i = 0; i < X.size(); i++) {
+	 //	Y[i] -= X[i];
+	 }
+	 for (int n = 0; n < N; n++) {
+	 err += std::abs(Y[n]) * std::abs(Y[n]);
+	 //		max = std::max(max, std::abs(X0[n]));
+	 printf("%i %e %e %e %e\n", n, 0.5*yr[n], 0.5*yi[n], Y[n].real(), Y[n].imag());
+	 }
+	 err = sqrt(err / N) / max;
+	 }
+
+	 printf("%4i %4i %e %e %e %e %e %e %e\n", N, fft_nops[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());
+	 }
+	 return;*/
 
 	tm3.reset();
 	tm4.reset();

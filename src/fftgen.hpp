@@ -22,6 +22,7 @@
 constexpr int NPAR = 4;
 #define MAXFFT 128
 #define DFFT 1
+#define LOOP_N 128
 
 struct fft_type {
 	int type;
@@ -44,9 +45,9 @@ std::string to_str(std::complex<double> z);
 int square_factor(int N);
 bool is_prime(int n);
 int greatest_prime_factor(int N);
-int mod_pow(int a, int b, int m);
+long long mod_pow(long long a, long long b, long long m);
 int mod_inv(int a, int m);
-int generator(int N);
+int generator(long long N);
 const std::vector<std::complex<double>> twiddles(int N);
 int index(int o, int i, int j, int N);
 int index_real(int o, int i, int j, int N);

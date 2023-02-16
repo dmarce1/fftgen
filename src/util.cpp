@@ -120,14 +120,14 @@ int index_real_inv(int o, int i, int j, int N) {
 	}
 }
 
-int mod_pow(int a, int b, int m) {
-	int rc = 1;
-	int apow = a;
+long long mod_pow(long long a, long long b, long long m) {
+	long long rc = 1;
+	long long apow = a;
 	while (b) {
-		if (b & 1) {
+		if (b & (long long) 1) {
 			rc = ((rc % m) * (apow % m)) % m;
 		}
-		b >>= 1;
+		b >>= (long long) 1;
 		apow = ((apow % m) * (apow % m)) % m;
 	}
 	return rc;
@@ -137,20 +137,23 @@ int mod_inv(int a, int m) {
 	return mod_pow(a, m - 2, m);
 }
 
-int generator(int N) {
-	for (int g = 2; g < 1000; g++) {
-		bool I[N];
-		for (int i = 0; i < N; i++) {
-			I[i] = false;
-		}
+int generator(long long N) {
+	for (long long g = 2; g < 1000; g++) {
+		std::vector<bool> I(N, false);
 		bool fail = false;
-		for (int m = 0; m < N - 1; m++) {
-			int n = mod_pow(g, m, N);
+		for (long long m = 0; m < N - (long long) 1; m++) {
+			long long n = mod_pow(g, m, N);
 			assert(n >= 0);
 			assert(n < N);
 			if (!I[n]) {
+				if( N == 839 && g == 11 ) {
+					printf( "%i %i\n", m, n);
+				}
 				I[n] = true;
 			} else {
+				if( N == 839 && g == 11 ) {
+					printf( "%i %i * \n", m, n);
+				}
 				fail = true;
 				break;
 			}

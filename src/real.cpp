@@ -1,4 +1,3 @@
-
 #include "fftgen.hpp"
 #include <list>
 #include <fftw3.h>
@@ -93,7 +92,6 @@ const std::vector<std::complex<double>> raders_sin_twiddle(int N) {
 	fftw_real(c, b);
 	return c;
 }
-
 
 void raders_fft_real(int N, int o) {
 	print("{\n");
@@ -193,7 +191,6 @@ void raders_fft_real(int N, int o) {
 	print("}\n");
 }
 
-
 std::vector<int> factors(int N) {
 	std::vector<int> f;
 	for (int N1 = 2; N1 <= N; N1++) {
@@ -207,21 +204,46 @@ std::vector<int> factors(int N) {
 }
 
 std::pair<int, int> best_radix_real(int N) {
-	if (is_prime(N) && N > 23) {
-		return std::make_pair(-1, 0);
-	} else {
-		const auto fs = factors(N);
-		int best_cnt = 999999999;
-		int best_radix;
-		for (int n = 0; n < fs.size(); n++) {
-			int cnt = fft_radix_real_opcnt(fs[n], N / fs[n]);
-			if (cnt < best_cnt) {
-				best_cnt = cnt;
-				best_radix = fs[n];
-			}
-		}
-		return std::make_pair(best_radix, best_cnt);
+	const int rader_radix = is_prime(N) ? 24 : 1000000000;
+	if (N % 6 == 0) {
+		return std::make_pair(6, 0);
 	}
+	int twopow = 0;
+	int n = N;
+	while (n % 2 == 0) {
+		twopow++;
+		n /= 2;
+	}
+	if (twopow >= 3 && twopow % 3 == 0) {
+		return std::make_pair(8, 0);
+	}
+	if (twopow >= 2 && twopow % 2 == 0) {
+		return std::make_pair(4, 0);
+	}
+	for (int r = 2; r <= rader_radix; r++) {
+		if (is_prime(r) && N % r == 0) {
+			return std::make_pair(r, 0);
+		}
+	}
+	return std::make_pair(-1, 0);
+	/*
+
+
+	 if (is_prime(N) && N > 23) {
+	 return std::make_pair(-1, 0);
+	 } else {
+	 const auto fs = factors(N);
+	 int best_cnt = 999999999;
+	 int best_radix;
+	 for (int n = 0; n < fs.size(); n++) {
+	 int cnt = fft_radix_real_opcnt(fs[n], N / fs[n]);
+	 if (cnt < best_cnt) {
+	 best_cnt = cnt;
+	 best_radix = fs[n];
+	 }
+	 }
+	 return std::make_pair(best_radix, best_cnt);
+	 }*/
 }
 
 void fft_real(int N) {
@@ -244,29 +266,51 @@ void fft_radix_real(int N1, int N2) {
 		}
 	}
 	int ipar = 0;
-	for (int k2 = 0; k2 < N2 / 2 + 1; k2++) {
-		for (int n1 = 0; n1 < N1; n1++) {
-			const int kr = N2 * n1 + k2;
-			const int ki = N2 * n1 + (N2 - k2);
-			const auto W = twiddle(n1 * k2, N);
-			if (k2 == 0) {
-			} else if (k2 == N2 / 2 && N2 % 2 == 0) {
-			} else {
-				if (n1 * k2 == 0) {
-				} else if (n1 * k2 == N / 2 && (N % 2 == 0)) {
-					print("x[%i] = -x[%i];\n", kr, kr);
-					print("x[%i] = -x[%i];\n", ki, ki);
-				} else if (n1 * k2 == N / 4 && (N % 4 == 0)) {
-					print("std::swap(x[%i], x[%i]);\n", kr, ki);
-					print("x[%i] = -x[%i];\n", ki, ki);
-				} else if (n1 * k2 == 3 * N / 4 && (N % 4 == 0)) {
-					print("std::swap(x[%i], x[%i]);\n", kr, ki);
-					print("x[%i] = -x[%i];\n", kr, kr);
+	if (N >= LOOP_N) {
+		if (N2 > 1) {
+			print("static twiddle_set<%i> twiddles;\n", N);
+			print("for( int n1 = 1; n1 < %i; n1++ ) {\n", N1);
+			indent();
+			print("const int n1N2 = n1 * %i;\n", N2);
+			print("for( int k2 = 1; k2 < %i; k2++ ) {\n", (N2+1) / 2);
+			indent();
+			print("const int i = n1N2 + k2;\n");
+			print("const auto tw = twiddles[n1 * k2];\n");
+			print("const int ir = %i * n1 + k2;\n", N2);
+			print("const int ii = %i * n1 + (%i - k2);\n", N2, N2);
+			print("tmp0 = x[ir];\n");
+			print("x[ir] = x[ir] * tw.real() - x[ii] * tw.imag();\n");
+			print("x[ii] = std::fma(tmp0, tw.imag(), x[ii] * tw.real());\n");
+			deindent();
+			print("}\n");
+			deindent();
+			print("}\n");
+		}
+	} else {
+		for (int k2 = 0; k2 < N2 / 2 + 1; k2++) {
+			for (int n1 = 0; n1 < N1; n1++) {
+				const int kr = N2 * n1 + k2;
+				const int ki = N2 * n1 + (N2 - k2);
+				const auto W = twiddle(n1 * k2, N);
+				if (k2 == 0) {
+				} else if (k2 == N2 / 2 && N2 % 2 == 0) {
 				} else {
-					print("tmp%i = x[%i];\n", ipar, kr);
-					print("x[%i] = std::fma(x[%i], %.17e, x[%i] * %.17e);\n", kr, kr, W.real(), ki, -W.imag());
-					print("x[%i] = std::fma(x[%i], %.17e, tmp%i * %.17e);\n", ki, ki, W.real(), ipar, W.imag());
-					ipar = (ipar + 1) % NPAR;
+					if (n1 * k2 == 0) {
+					} else if (n1 * k2 == N / 2 && (N % 2 == 0)) {
+						print("x[%i] = -x[%i];\n", kr, kr);
+						print("x[%i] = -x[%i];\n", ki, ki);
+					} else if (n1 * k2 == N / 4 && (N % 4 == 0)) {
+						print("std::swap(x[%i], x[%i]);\n", kr, ki);
+						print("x[%i] = -x[%i];\n", ki, ki);
+					} else if (n1 * k2 == 3 * N / 4 && (N % 4 == 0)) {
+						print("std::swap(x[%i], x[%i]);\n", kr, ki);
+						print("x[%i] = -x[%i];\n", kr, kr);
+					} else {
+						print("tmp%i = x[%i];\n", ipar, kr);
+						print("x[%i] = std::fma(x[%i], %.17e, x[%i] * %.17e);\n", kr, kr, W.real(), ki, -W.imag());
+						print("x[%i] = std::fma(x[%i], %.17e, tmp%i * %.17e);\n", ki, ki, W.real(), ipar, W.imag());
+						ipar = (ipar + 1) % NPAR;
+					}
 				}
 			}
 		}
