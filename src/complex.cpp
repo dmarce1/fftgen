@@ -624,6 +624,40 @@ void fft_radix_dit(int r, int N, int o) {
 		print("y[%i] = yr1 - yi7;\n", index(o, 0 + 7 * N / 8, 0, N));
 		print("y[%i] = yi1 + yr7;\n", index(o, 0 + 7 * N / 8, 1, N));
 		break;
+		/*case 9:
+		printf("Using radix 9 for n = %i\n", N);
+		{
+			const auto theta = 2.0 * M_PI / 9.0;
+			const auto c1 = sin(3.0 * theta);
+			const auto c2 = cos(theta);
+			const auto c3 = sin(theta);
+			const auto c4 = cos(2.0 * theta);
+			const auto c5 = sin(2.0 * theta);
+			const auto c6 = c1 * c2;
+			const auto c7 = c1 * c3;
+			const auto c8 = c1 * c4;
+			const auto c9 = c1 * c5;
+			print("const auto tr1 = zr3 + zr6;\n");
+			print("y[%i] = yr0;\n", index(o, 0 + 0 * N / 9, 0, N));
+			print("y[%i] = yi0;\n", index(o, 0 + 0 * N / 9, 1, N));
+			print("y[%i] = yr1 + yi8;\n", index(o, 0 + 1 * N / 9, 0, N));
+			print("y[%i] = yi1 - yr8;\n", index(o, 0 + 1 * N / 9, 1, N));
+			print("y[%i] = yr2 + yi7;\n", index(o, 0 + 2 * N / 9, 0, N));
+			print("y[%i] = yi2 - yr7;\n", index(o, 0 + 2 * N / 9, 1, N));
+			print("y[%i] = yr3 + yi6;\n", index(o, 0 + 3 * N / 9, 0, N));
+			print("y[%i] = yi3 - yr6;\n", index(o, 0 + 3 * N / 9, 1, N));
+			print("y[%i] = yr4 + yi5;\n", index(o, 0 + 4 * N / 9, 0, N));
+			print("y[%i] = yi4 - yr5;\n", index(o, 0 + 4 * N / 9, 1, N));
+			print("y[%i] = yr4 - yi5;\n", index(o, 0 + 5 * N / 9, 0, N));
+			print("y[%i] = yi4 + yr5;\n", index(o, 0 + 5 * N / 9, 1, N));
+			print("y[%i] = yr3 - yi6;\n", index(o, 0 + 6 * N / 9, 0, N));
+			print("y[%i] = yi3 + yr6;\n", index(o, 0 + 6 * N / 9, 1, N));
+			print("y[%i] = yr2 - yi7;\n", index(o, 0 + 7 * N / 9, 0, N));
+			print("y[%i] = yi2 + yr7;\n", index(o, 0 + 7 * N / 9, 1, N));
+			print("y[%i] = yr1 - yi8;\n", index(o, 0 + 8 * N / 9, 0, N));
+			print("y[%i] = yi1 + yr8;\n", index(o, 0 + 8 * N / 9, 1, N));
+		}
+		break;*/
 	default:
 		for (int j = 1; j <= (r - 1) / 2; j++) {
 			print("const auto txp%i = zr%i + zr%i;\n", j, j, r - j);
@@ -679,7 +713,7 @@ fft_type best_radix(int N, int o, bool first) {
 	fft_type fftt;
 	fftt.type = RADIX;
 	fftt.nops = 0;
-	const int rader_radix = is_prime(N) ? 24 : 1000000000;
+	const int rader_radix = is_prime(N) ? RADER_LEN : 1000000000;
 	if (N % 6 == 0) {
 		fftt.N1 = 6;
 	} else {
@@ -694,17 +728,27 @@ fft_type best_radix(int N, int o, bool first) {
 		} else if (twopow >= 2 && twopow % 2 == 0) {
 			fftt.N1 = 4;
 		} else {
-			bool found = false;
-			for (int r = 2; r <= rader_radix; r++) {
-				if (is_prime(r) && N % r == 0) {
-					fftt.N1 = r;
-					found = true;
-					break;
-				}
+			int threepow = 0;
+			int n = N;
+			while (n % 3 == 0) {
+				threepow++;
+				n /= 3;
 			}
-			if (!found) {
-				fftt.type = RADERS;
-				fftt.N1 = N;
+			if (false && threepow >= 2 && threepow % 2 == 0) {
+				fftt.N1 = 9;
+			} else {
+				bool found = false;
+				for (int r = 2; r <= rader_radix; r++) {
+					if (is_prime(r) && N % r == 0) {
+						fftt.N1 = r;
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					fftt.type = RADERS;
+					fftt.N1 = N;
+				}
 			}
 		}
 	}

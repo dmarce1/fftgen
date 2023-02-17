@@ -92,7 +92,6 @@ const std::vector<std::complex<double>> raders_sin_twiddle(int N) {
 	fftw_real(c, b);
 	return c;
 }
-
 void raders_fft_real(int N, int o) {
 	print("{\n");
 	indent();
@@ -109,84 +108,136 @@ void raders_fft_real(int N, int o) {
 	const auto ginvq = raders_ginvq(N);
 	const auto ginvqh = raders_ginvq_half(N);
 	const int L = (N - 1);
-	print("double xok = x[%i];\n", o);
-	print("double xo = x[%i];\n", o);
-	print("std::array<double, %i> z;\n", L);
-	for (int q = 0; q < L; q++) {
-		print("xo += x[%i];\n", o + q + 1);
-	}
-	for (int q = 0; q < L; q++) {
-		print("z[%i] = x[%i];\n", q, o + gq[q]);
-	}
-	print("{\n");
+	print("double xok = x[%i];\n", o + L);
+	print("double xo = x[%i];\n", o + L);
+	print("for (int q = 0; q < %i; q++) {\n", L);
 	indent();
-	print("auto* x = z.data();\n");
-	fft_bitreverse_real(L);
-	print("fft_real_base_%i(x);\n", L);
+	print("xo += x[q];\n");
 	deindent();
 	print("}\n");
-	print("z[0] *= -1.0;\n");
-	for (int q = 0; q < L / 2; q += 2) {
-		if (q != 0) {
-			print("tmp1 = z[%i];\n", q);
-		}
-		if (!(q == L / 2 - 1 && (L / 2) % 2 == 1)) {
-			print("tmp0 = z[%i];\n", q + 1);
-		}
-		if (q != 0) {
-			print("z[%i] = std::fma((%.17e), z[%i], (%.17e) * z[%i]);\n", q, acos[q].real(), q, -acos[q].imag(), L - q);
-		}
-		if (!(q == L / 2 - 1 && (L / 2) % 2 == 1)) {
-			print("z[%i] = std::fma((%.17e), z[%i], (%.17e) * z[%i]);\n", (q + 1), bsin[(q + 1)].real(), (q + 1), -bsin[(q + 1)].imag(), L - (q + 1));
-		}
-		if (q != 0) {
-			print("z[%i] = std::fma((%.17e), tmp1, (%.17e) * z[%i]);\n", L - q, acos[q].imag(), acos[q].real(), L - q);
-		}
-		if (!(q == L / 2 - 1 && (L / 2) % 2 == 1)) {
-			print("z[%i] = std::fma((%.17e), tmp0, (%.17e) * z[%i]);\n", L - (q + 1), bsin[(q + 1)].imag(), bsin[(q + 1)].real(), L - (q + 1));
-		}
-	}
-	print("z[%i] *= %.17e;\n", L / 2, (L / 2) % 2 == 0 ? acos[L / 2].real() : bsin[L / 2].real());
-	print("{\n");
-	indent();
-	print("x[%i] = z[0];\n", o);
-	for (int n = 1; n < L; n++) {
-		if (n <= L - n) {
-			print("x[%i] = z[%i] + z[%i];\n", o + n, n, L - n);
-		} else {
-			print("x[%i] = z[%i] - z[%i];\n", o + n, L - n, n);
-		}
-	}
-	if (L % 2 == 0) {
-		print("x[%i] = z[%i];\n", o + L / 2, L / 2);
-	}
-	fft_bitreverse_real(L, fft_bitreverse_indices_real(L), o);
 	print("fft_real_base_%i(x);\n", L);
-	print("z[0] = x[%i];\n", o);
-	for (int n = 1; n < L; n++) {
-		if (n <= L - n) {
-			print("z[%i] = x[%i] + x[%i];\n", n, o + n, o + L - n);
-		} else {
-			print("z[%i] = x[%i] - x[%i];\n", n, o + L - n, o + n);
+	if (N > LOOP_N) {
+		print("static const raders_cos_twiddles<%i> acos;\n", N);
+		print("static const raders_sin_twiddles<%i> bsin;\n", N);
+		print("const auto b = bsin[0];\n", L / 2);
+		print("tmp1 = x[1];\n");
+		print("x[1] = b.real() * x[1] - b.imag() * x[%i];\n", L - 1);
+		print("x[%i] = std::fma(b.imag(), tmp1, b.real() * x[%i]);\n", L - 1, L - 1);
+
+		print("for (int q = 2; q < %i; q += 2) {\n", L / 2);
+		indent();
+		print("const auto a = acos[q >> 1];\n");
+		print("tmp1 = x[q];\n");
+		print("x[q] = a.real() * x[q] - a.imag() * x[%i - q];\n", L);
+		print("x[%i - q] = std::fma(a.imag(), tmp1, a.real() * x[%i - q]);\n", L, L);
+		deindent();
+		print("}\n");
+
+		print("for (int q = 3; q < %i; q += 2) {\n", (L - 1) / 2 + 1);
+		indent();
+		print("const auto b = bsin[q >> 1];\n");
+		print("tmp1 = x[q];\n");
+		print("x[q] = b.real() * x[q] - b.imag() * x[%i - q];\n", L);
+		print("x[%i - q] = std::fma(b.imag(), tmp1, b.real() * x[%i - q]);\n", L, L);
+		deindent();
+		print("}\n");
+	} else {
+		for (int q = 0; q < L / 2; q += 2) {
+			if (q != 0) {
+				print("tmp1 = x[%i];\n", q);
+			}
+			if (!(q == L / 2 - 1 && (L / 2) % 2 == 1)) {
+				print("tmp0 = x[%i];\n", q + 1);
+			}
+			if (q != 0) {
+				print("x[%i] = std::fma((%.17e), x[%i], (%.17e) * x[%i]);\n", q, acos[q].real(), q, -acos[q].imag(), L - q);
+			}
+			if (!(q == L / 2 - 1 && (L / 2) % 2 == 1)) {
+				print("x[%i] = std::fma((%.17e), x[%i], (%.17e) * x[%i]);\n", (q + 1), bsin[(q + 1)].real(), (q + 1), -bsin[(q + 1)].imag(), L - (q + 1));
+			}
+			if (q != 0) {
+				print("x[%i] = std::fma((%.17e), tmp1, (%.17e) * x[%i]);\n", L - q, acos[q].imag(), acos[q].real(), L - q);
+			}
+			if (!(q == L / 2 - 1 && (L / 2) % 2 == 1)) {
+				print("x[%i] = std::fma((%.17e), tmp0, (%.17e) * x[%i]);\n", L - (q + 1), bsin[(q + 1)].imag(), bsin[(q + 1)].real(), L - (q + 1));
+			}
 		}
 	}
-	if (L % 2 == 0) {
-		print("z[%i] = x[%i];\n", L / 2, o + L / 2);
+	print("x[0] *= -1.0;\n");
+	print("x[%i] *= %.17e;\n", L / 2, (L / 2) % 2 == 0 ? acos[L / 2].real() : bsin[L / 2].real());
+	if (N >= LOOP_N) {
+		print("for (int n = 1; n < %i - n; n++) {\n", L);
+		indent();
+		print("tmp0 = x[n];\n");
+		print("const int Lmn = %i - n;\n", L);
+		print("x[n] += x[Lmn];\n", L);
+		print("x[Lmn] = tmp0 - x[Lmn];\n", L, L);
+		deindent();
+		print("}\n");
+	} else {
+		for (int n = 1; n < L - n; n++) {
+			print("tmp0 = x[%i];\n", n);
+			print("x[%i] += x[%i];\n", n, L - n);
+			print("x[%i] = tmp0 - x[%i];\n", L - n, L - n);
+		}
 	}
+	print("fft_bitreverse_real_%i(x);\n", L);
+	print("fft_real_base_%i(x);\n", L);
+	if (N >= LOOP_N) {
+		print("for (int n = 1; n < %i - n; n++) {\n", L);
+		indent();
+		print("tmp0 = x[n];\n");
+		print("const int Lmn = %i - n;\n", L);
+		print("x[n] += x[Lmn];\n", L);
+		print("x[Lmn] = tmp0 - x[Lmn];\n", L, L);
+		deindent();
+		print("}\n");
+	} else {
+		for (int n = 1; n < L - n; n++) {
+			print("tmp0 = x[%i];\n", n);
+			print("x[%i] += x[%i];\n", n, L - n);
+			print("x[%i] = tmp0 - x[%i];\n", L - n, L - n);
+		}
+	}
+	print("for (int q = 0; q < %i; q++) {\n", L);
+	indent();
+	print("x[q] *= %.17e;\n", (0.5 / L));
 	deindent();
 	print("}\n");
-	for (int q = 0; q < L; q++) {
-		print("z[%i] *= %.17e;\n", q, (0.5 / L));
+	if (N >= LOOP_N) {
+		print("for (int p = 0; p < %i; p++) {\n", L / 2);
+		indent();
+		print("tmp0 = x[p];\n");
+		print("const int q = p + %i;\n", L / 2);
+		print("x[p] += xok + x[q];\n");
+		print("x[q] = tmp0 - x[q];\n");
+		deindent();
+		print("}\n");
+		for (int p = 0; p < L / 2; p++) {
+			if (ginvq[p] <= L / 2) {
+			} else {
+				print("x[%i] = -x[%i];\n", p + L / 2 + o, p + L / 2);
+			}
+		}
+	} else {
+		for (int p = 0; p < L / 2; p++) {
+			print("tmp0 = x[%i];\n", p);
+			print("x[%i] += xok + x[%i];\n", p + o, p + L / 2);
+			if (ginvq[p] <= L / 2) {
+				print("x[%i] = tmp0 - x[%i];\n", p + L / 2 + o, p + L / 2);
+			} else {
+				print("x[%i] = x[%i] - tmp0;\n", p + L / 2 + o, p + L / 2);
+			}
+		}
 	}
-	print("x[%i] = xo;\n", o);
+	std::vector<int> I(N);
 	for (int p = 0; p < L / 2; p++) {
-		print("x[%i] = xok + z[%i] + z[%i];\n", ginvqh[p] + o, p, p + L / 2);
-		if (ginvq[p] <= L / 2) {
-			print("x[%i] = z[%i] - z[%i];\n", N - ginvqh[p] + o, p, p + L / 2);
-		} else {
-			print("x[%i] = z[%i] - z[%i];\n", N - ginvqh[p] + o, p + L / 2, p);
-		}
+		I[ginvqh[p]] = p;
+		I[N - ginvqh[p]] = p + L / 2;
 	}
+	I[0] = N - 1;
+	fft_bitreverse_real(N, I);
+	print("x[%i] = xo;\n", o);
 	deindent();
 	print("}\n");
 }
@@ -204,7 +255,7 @@ std::vector<int> factors(int N) {
 }
 
 std::pair<int, int> best_radix_real(int N) {
-	const int rader_radix = is_prime(N) ? 24 : 1000000000;
+	const int rader_radix = is_prime(N) ? RADER_LEN : 1000000000;
 	if (N % 6 == 0) {
 		return std::make_pair(6, 0);
 	}
@@ -272,7 +323,7 @@ void fft_radix_real(int N1, int N2) {
 			print("for( int n1 = 1; n1 < %i; n1++ ) {\n", N1);
 			indent();
 			print("const int n1N2 = n1 * %i;\n", N2);
-			print("for( int k2 = 1; k2 < %i; k2++ ) {\n", (N2+1) / 2);
+			print("for( int k2 = 1; k2 < %i; k2++ ) {\n", (N2 + 1) / 2);
 			indent();
 			print("const int i = n1N2 + k2;\n");
 			print("const auto tw = twiddles[n1 * k2];\n");
@@ -492,297 +543,302 @@ void fft_radix_real(int N1, int N2) {
 	}
 	deindent();
 	print("}\n");
-
-	print("for (int k2 = 1; k2 < %i; k2++) {\n", (N2 + 1) / 2);
+	if ((N2 + 1) / 2 > 1) {
+		if ((N2 + 1) / 2 == 2) {
+			print("const int k2 = 1;\n");
+			print("{\n");
+		} else {
+			print("for (int k2 = 1; k2 < %i; k2++) {\n", (N2 + 1) / 2);
+		}
 //		print("{\n");
-	indent();
-	print("auto* xp = x + k2;\n");
-	print("auto* xm = x + (%i - k2);\n", N);
-	for (int k1 = 0; k1 < N1; k1++) {
-		const int kr = N2 * k1;
-		const int ki = N2 * (N1 - k1 - 1);
-		const auto W = twiddle(k1 * k1, N1);
-		print("const auto zr%i = xp[%i];\n", k1, kr);
-		print("const auto zi%i = xm[%i];\n", k1, -ki);
-	}
+		indent();
+		print("auto* xp = x + k2;\n");
+		print("auto* xm = x + (%i - k2);\n", N);
+		for (int k1 = 0; k1 < N1; k1++) {
+			const int kr = N2 * k1;
+			const int ki = N2 * (N1 - k1 - 1);
+			const auto W = twiddle(k1 * k1, N1);
+			print("const auto zr%i = xp[%i];\n", k1, kr);
+			print("const auto zi%i = xm[%i];\n", k1, -ki);
+		}
 
-	switch (N1) {
-	case 1:
-		return;
-	case 2:
-		print("xp[%i] = zr0 + zr1;\n", 0);
-		print("xm[%i] = zi0 + zi1;\n", -0);
-		print("xm[%i] = zr0 - zr1;\n", -N2);
-		print("xp[%i] = zi1 - zi0;\n", N2);
-		break;
-	case 3:
-		print("const auto tr1 = zr1 + zr2;\n");
-		print("const auto tr2 = std::fma(tr1, -0.5, zr0);\n");
-		print("const auto tr3 = (%24.17e) * (zr1 - zr2);\n", sqrt(3) * 0.5);
-		print("const auto ti1 = zi1 + zi2;\n");
-		print("const auto ti2 = std::fma(ti1, -0.5, zi0);\n");
-		print("const auto ti3 = (%24.17e) * (zi1 - zi2);\n", sqrt(3) * 0.5);
-		print("xp[%i] = zr0 + tr1;\n", 0);
-		print("xm[%i] = zi0 + ti1;\n", 0);
-		print("xp[%i] = tr2 + ti3;\n", N2);
-		print("xm[%i] = ti2 - tr3;\n", -N2);
-		print("xm[%i] = tr2 - ti3;\n", -2 * N2);
-		print("xp[%i] = -ti2 - tr3;\n", 2 * N2);
-		break;
-	case 4:
-		print("const auto tr1 = zr0 + zr2;\n");
-		print("const auto ti1 = zi0 + zi2;\n");
-		print("const auto tr2 = zr1 + zr3;\n");
-		print("const auto ti2 = zi1 + zi3;\n");
-		print("const auto tr3 = zr0 - zr2;\n");
-		print("const auto ti3 = zi0 - zi2;\n");
-		print("const auto tr4 = zr1 - zr3;\n");
-		print("const auto ti4 = zi1 - zi3;\n");
-		print("xp[%i] = tr1 + tr2;\n", 0);
-		print("xm[%i] = ti1 + ti2;\n", 0);
-		print("xp[%i] = tr3 + ti4;\n", N2);
-		print("xm[%i] = ti3 - tr4;\n", -N2);
-		print("xm[%i] = tr1 - tr2;\n", -2 * N2);
-		print("xp[%i] = ti2 - ti1 ;\n", 2 * N2);
-		print("xm[%i] = tr3 - ti4;\n", -3 * N2);
-		print("xp[%i] = -(ti3 + tr4);\n", 3 * N2);
-		break;
-	case 5:
-		print("const auto tr1 = zr1 + zr4;\n");
-		print("const auto tr2 = zr2 + zr3;\n");
-		print("const auto tr3 = zr1 - zr4;\n");
-		print("const auto tr4 = zr2 - zr3;\n");
-		print("const auto tr5 = tr1 + tr2;\n");
-		print("const auto tr6 = (%24.17e) * (tr1 - tr2);\n", sqrt(5) * 0.25);
-		print("const auto tr7 = std::fma(tr5, -0.25, zr0);\n");
-		print("const auto tr8 = tr7 + tr6;\n");
-		print("const auto tr9 = tr7 - tr6;\n");
-		print("const auto tr10 = std::fma((%24.17e), tr3, (%24.17e) * tr4);\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
-		print("const auto tr11 = std::fma((%24.17e), tr3, (%24.17e) * tr4);\n", sin(2.0 * M_PI / 10.0), -sin(2.0 * M_PI / 5.0));
-		print("const auto ti1 = zi1 + zi4;\n");
-		print("const auto ti2 = zi2 + zi3;\n");
-		print("const auto ti3 = zi1 - zi4;\n");
-		print("const auto ti4 = zi2 - zi3;\n");
-		print("const auto ti5 = ti1 + ti2;\n");
-		print("const auto ti6 = (%24.17e) * (ti1 - ti2);\n", sqrt(5) * 0.25);
-		print("const auto ti7 = std::fma(ti5, -0.25, zi0);\n");
-		print("const auto ti8 = ti7 + ti6;\n");
-		print("const auto ti9 = ti7 - ti6;\n");
-		print("const auto ti10 = std::fma((%24.17e), ti3, (%24.17e) * ti4);\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
-		print("const auto ti11 = std::fma((%24.17e), ti3, (%24.17e) * ti4);\n", sin(2.0 * M_PI / 10.0), -sin(2.0 * M_PI / 5.0));
-		print("xp[%i] = zr0 + tr5;\n", 0);
-		print("xm[%i] = zi0 + ti5;\n", 0);
-		print("xp[%i] = tr8 + ti10;\n", N2);
-		print("xm[%i] = ti8 - tr10;\n", -N2);
-		print("xp[%i] = tr9 + ti11;\n", 2 * N2);
-		print("xm[%i] = ti9 - tr11;\n", -2 * N2);
-		print("xm[%i] = tr9 - ti11;\n", -3 * N2);
-		print("xp[%i] = -ti9 - tr11;\n", 3 * N2);
-		print("xm[%i] = tr8 - ti10;\n", -4 * N2);
-		print("xp[%i] = -ti8 - tr10;\n", 4 * N2);
-		break;
-	case 6:
-		print("const auto tr1 = zr2 + zr4;\n");
-		print("const auto ti1 = zi2 + zi4;\n");
-		print("const auto tr2 = std::fma(tr1, -0.5, zr0);\n");
-		print("const auto ti2 = std::fma(ti1, -0.5, zi0);\n");
-		print("const auto tr3 = (%24.17e) * (zr2 - zr4);\n", sin(M_PI / 3.0));
-		print("const auto ti3 = (%24.17e) * (zi2 - zi4);\n", sin(M_PI / 3.0));
-		print("const auto tr4 = zr5 + zr1;\n");
-		print("const auto ti4 = zi5 + zi1;\n");
-		print("const auto tr5 = std::fma(tr4, -0.5, zr3);\n");
-		print("const auto ti5 = std::fma(ti4, -0.5, zi3);\n");
-		print("const auto tr6 = (%24.17e) * (zr5 - zr1);\n", sin(M_PI / 3.0));
-		print("const auto ti6 = (%24.17e) * (zi5 - zi1);\n", sin(M_PI / 3.0));
-		print("const auto tr7 = zr0 + tr1;\n");
-		print("const auto ti7 = zi0 + ti1;\n");
-		print("const auto tr8 = tr2 + ti3;\n");
-		print("const auto ti8 = ti2 - tr3;\n");
-		print("const auto tr9 = tr2 - ti3;\n");
-		print("const auto ti9 = ti2 + tr3;\n");
-		print("const auto tr10 = zr3 + tr4;\n");
-		print("const auto ti10 = zi3 + ti4;\n");
-		print("const auto tr11 = tr5 + ti6;\n");
-		print("const auto ti11 = ti5 - tr6;\n");
-		print("const auto tr12 = tr5 - ti6;\n");
-		print("const auto ti12 = ti5 + tr6;\n");
-		print("xp[%i] = tr7 + tr10;\n", 0);
-		print("xm[%i] = ti7 + ti10;\n", 0);
-		print("xp[%i] = tr8 - tr11;\n", N2);
-		print("xm[%i] = ti8 - ti11;\n", -N2);
-		print("xp[%i] = tr9 + tr12;\n", 2 * N2);
-		print("xm[%i] = ti9 + ti12;\n", -2 * N2);
-		print("xm[%i] = tr7 - tr10;\n", -3 * N2);
-		print("xp[%i] = -ti7 + ti10;\n", 3 * N2);
-		print("xm[%i] = tr8 + tr11;\n", -4 * N2);
-		print("xp[%i] = -ti8 - ti11;\n", 4 * N2);
-		print("xm[%i] = tr9 - tr12;\n", -5 * N2);
-		print("xp[%i] = -ti9 + ti12;\n", 5 * N2);
-		break;
-	case 7: {
-		constexpr double theta = 2.0 * M_PI / 7.0;
-		const double c1 = cos(theta);
-		const double c2 = cos(2.0 * theta);
-		const double c3 = cos(3.0 * theta);
-		const double c4 = sin(theta);
-		const double c5 = sin(2.0 * theta);
-		const double c6 = sin(3.0 * theta);
-		print("const auto tr1 = zr1 + zr6;\n");
-		print("const auto ti1 = zi1 + zi6;\n");
-		print("const auto tr2 = zr2 + zr5;\n");
-		print("const auto ti2 = zi2 + zi5;\n");
-		print("const auto tr3 = zr3 + zr4;\n");
-		print("const auto ti3 = zi3 + zi4;\n");
-		print("const auto tr4 = zr1 - zr6;\n");
-		print("const auto ti4 = zi1 - zi6;\n");
-		print("const auto tr5 = zr2 - zr5;\n");
-		print("const auto ti5 = zi2 - zi5;\n");
-		print("const auto tr6 = zr3 - zr4;\n");
-		print("const auto ti6 = zi3 - zi4;\n");
-		print("const auto tr7 = zr0 - 0.5 * tr3;\n");
-		print("const auto ti7 = zi0 - 0.5 * ti3;\n");
-		print("const auto tr8 = tr1 - tr3;\n");
-		print("const auto ti8 = ti1 - ti3;\n");
-		print("const auto tr9 = tr2 - tr3;\n");
-		print("const auto ti9 = ti2 - ti3;\n");
-		print("const auto yr0 = zr0 + tr1 + tr2 + tr3;\n");
-		print("const auto yi0 = zi0 + ti1 + ti2 + ti3;\n");
-		print("const auto yr1 = std::fma(tr8, %.17e, std::fma(tr9, %.17e, tr7));\n", c1, c2);
-		print("const auto yi1 = std::fma(ti8, %.17e, std::fma(ti9, %.17e, ti7));\n", c1, c2);
-		print("const auto yr2 = std::fma(tr8, %.17e, std::fma(tr9, %.17e, tr7));\n", c2, c3);
-		print("const auto yi2 = std::fma(ti8, %.17e, std::fma(ti9, %.17e, ti7));\n", c2, c3);
-		print("const auto yr3 = std::fma(tr8, %.17e, std::fma(tr9, %.17e, tr7));\n", c3, c1);
-		print("const auto yi3 = std::fma(ti8, %.17e, std::fma(ti9, %.17e, ti7));\n", c3, c1);
-		print("const auto yr4 = std::fma(tr4, %.17e, std::fma(tr5, %.17e, tr6 * %.17e));\n", c6, -c4, c5);
-		print("const auto yi4 = std::fma(ti4, %.17e, std::fma(ti5, %.17e, ti6 * %.17e));\n", c6, -c4, c5);
-		print("const auto yr5 = std::fma(tr4, %.17e, std::fma(tr5, %.17e, tr6 * %.17e));\n", c5, -c6, -c4);
-		print("const auto yi5 = std::fma(ti4, %.17e, std::fma(ti5, %.17e, ti6 * %.17e));\n", c5, -c6, -c4);
-		print("const auto yr6 = std::fma(tr4, %.17e, std::fma(tr5, %.17e, tr6 * %.17e));\n", c4, c5, c6);
-		print("const auto yi6 = std::fma(ti4, %.17e, std::fma(ti5, %.17e, ti6 * %.17e));\n", c4, c5, c6);
-		print("xp[%i] = yr0;\n", 0);
-		print("xm[%i] = yi0;\n", 0);
-		print("xp[%i] = yr1 + yi6;\n", N2);
-		print("xm[%i] = yi1 - yr6;\n", -N2);
-		print("xp[%i] = yr2 + yi5;\n", 2 * N2);
-		print("xm[%i] = yi2 - yr5;\n", -2 * N2);
-		print("xp[%i] = yr3 + yi4;\n", 3 * N2);
-		print("xm[%i] = yi3 - yr4;\n", -3 * N2);
-		print("xm[%i] = yr3 - yi4;\n", -4 * N2);
-		print("xp[%i] = -yi3 - yr4;\n", 4 * N2);
-		print("xm[%i] = yr2 - yi5;\n", -5 * N2);
-		print("xp[%i] = -yi2 - yr5;\n", 5 * N2);
-		print("xm[%i] = yr1 - yi6;\n", -6 * N2);
-		print("xp[%i] = -yi1 - yr6;\n", 6 * N2);
-	}
-		break;
-	case 8:
-		printf("N = %i - real Radix 8\n", N);
-		print("const auto tr1 = zr0 + zr4;\n");
-		print("const auto ti1 = zi0 + zi4;\n");
-		print("const auto tr2 = zr0 - zr4;\n");
-		print("const auto ti2 = zi0 - zi4;\n");
-		print("const auto tr3 = zr1 + zr5;\n");
-		print("const auto ti3 = zi1 + zi5;\n");
-		print("const auto tr4 = zr1 - zr5;\n");
-		print("const auto ti4 = zi1 - zi5;\n");
-		print("const auto tr5 = zr2 + zr6;\n");
-		print("const auto ti5 = zi2 + zi6;\n");
-		print("const auto tr6 = zr2 - zr6;\n");
-		print("const auto ti6 = zi2 - zi6;\n");
-		print("const auto tr7 = zr3 + zr7;\n");
-		print("const auto ti7 = zi3 + zi7;\n");
-		print("const auto tr8 = zr3 - zr7;\n");
-		print("const auto ti8 = zi3 - zi7;\n");
-		print("const auto tr9 = tr1 + tr5;\n");
-		print("const auto ti9 = ti1 + ti5;\n");
-		print("const auto tr10 = tr3 + tr7;\n");
-		print("const auto ti10 = ti3 + ti7;\n");
-		print("const auto tr11 = (%.17e) * (tr4 - tr8);\n", 1.0 / sqrt(2));
-		print("const auto ti11 = (%.17e) * (ti4 - ti8);\n", 1.0 / sqrt(2));
-		print("const auto tr12 = (%.17e) * (tr4 + tr8);\n", 1.0 / sqrt(2));
-		print("const auto ti12 = (%.17e) * (ti4 + ti8);\n", 1.0 / sqrt(2));
-		print("const auto yr0 = tr9 + tr10;\n");
-		print("const auto yi0 = ti9 + ti10;\n");
-		print("const auto yr1 = tr2 + tr11;\n");
-		print("const auto yi1 = ti2 + ti11;\n");
-		print("const auto yr2 = tr1 - tr5;\n");
-		print("const auto yi2 = ti1 - ti5;\n");
-		print("const auto yr3 = tr2 - tr11;\n");
-		print("const auto yi3 = ti2 - ti11;\n");
-		print("const auto yr4 = tr9 - tr10;\n");
-		print("const auto yi4 = ti9 - ti10;\n");
-		print("const auto yr5 = tr12 - tr6;\n");
-		print("const auto yi5 = ti12 - ti6;\n");
-		print("const auto yr6 = tr3 - tr7;\n");
-		print("const auto yi6 = ti3 - ti7;\n");
-		print("const auto yr7 = tr12 + tr6;\n");
-		print("const auto yi7 = ti12 + ti6;\n");
-		print("xp[%i] = yr0;\n", 0);
-		print("xm[%i] = yi0;\n", 0);
-		print("xp[%i] = yr1 + yi7;\n", N2);
-		print("xm[%i] = yi1 - yr7;\n", -N2);
-		print("xp[%i] = yr2 + yi6;\n", 2 * N2);
-		print("xm[%i] = yi2 - yr6;\n", -2 * N2);
-		print("xp[%i] = yr3 + yi5;\n", 3 * N2);
-		print("xm[%i] = yi3 - yr5;\n", -3 * N2);
-		print("xm[%i] = yr4;\n", -4 * N2);
-		print("xp[%i] = -yi4;\n", 4 * N2);
-		print("xm[%i] = yr3 - yi5;\n", -5 * N2);
-		print("xp[%i] = -(yi3 + yr5);\n", 5 * N2);
-		print("xm[%i] = yr2 - yi6;\n", -6 * N2);
-		print("xp[%i] = -(yi2 + yr6);\n", 6 * N2);
-		print("xm[%i] = yr1 - yi7;\n", -7 * N2);
-		print("xp[%i] = -(yi1 + yr7);\n", 7 * N2);
-		break;
-	default:
-		for (int j = 1; j <= (N1 - 1) / 2; j++) {
-			print("const auto txp%i = zr%i + zr%i;\n", j, j, N1 - j);
+		switch (N1) {
+		case 1:
+			return;
+		case 2:
+			print("xp[%i] = zr0 + zr1;\n", 0);
+			print("xm[%i] = zi0 + zi1;\n", -0);
+			print("xm[%i] = zr0 - zr1;\n", -N2);
+			print("xp[%i] = zi1 - zi0;\n", N2);
+			break;
+		case 3:
+			print("const auto tr1 = zr1 + zr2;\n");
+			print("const auto tr2 = std::fma(tr1, -0.5, zr0);\n");
+			print("const auto tr3 = (%24.17e) * (zr1 - zr2);\n", sqrt(3) * 0.5);
+			print("const auto ti1 = zi1 + zi2;\n");
+			print("const auto ti2 = std::fma(ti1, -0.5, zi0);\n");
+			print("const auto ti3 = (%24.17e) * (zi1 - zi2);\n", sqrt(3) * 0.5);
+			print("xp[%i] = zr0 + tr1;\n", 0);
+			print("xm[%i] = zi0 + ti1;\n", 0);
+			print("xp[%i] = tr2 + ti3;\n", N2);
+			print("xm[%i] = ti2 - tr3;\n", -N2);
+			print("xm[%i] = tr2 - ti3;\n", -2 * N2);
+			print("xp[%i] = -ti2 - tr3;\n", 2 * N2);
+			break;
+		case 4:
+			print("const auto tr1 = zr0 + zr2;\n");
+			print("const auto ti1 = zi0 + zi2;\n");
+			print("const auto tr2 = zr1 + zr3;\n");
+			print("const auto ti2 = zi1 + zi3;\n");
+			print("const auto tr3 = zr0 - zr2;\n");
+			print("const auto ti3 = zi0 - zi2;\n");
+			print("const auto tr4 = zr1 - zr3;\n");
+			print("const auto ti4 = zi1 - zi3;\n");
+			print("xp[%i] = tr1 + tr2;\n", 0);
+			print("xm[%i] = ti1 + ti2;\n", 0);
+			print("xp[%i] = tr3 + ti4;\n", N2);
+			print("xm[%i] = ti3 - tr4;\n", -N2);
+			print("xm[%i] = tr1 - tr2;\n", -2 * N2);
+			print("xp[%i] = ti2 - ti1 ;\n", 2 * N2);
+			print("xm[%i] = tr3 - ti4;\n", -3 * N2);
+			print("xp[%i] = -(ti3 + tr4);\n", 3 * N2);
+			break;
+		case 5:
+			print("const auto tr1 = zr1 + zr4;\n");
+			print("const auto tr2 = zr2 + zr3;\n");
+			print("const auto tr3 = zr1 - zr4;\n");
+			print("const auto tr4 = zr2 - zr3;\n");
+			print("const auto tr5 = tr1 + tr2;\n");
+			print("const auto tr6 = (%24.17e) * (tr1 - tr2);\n", sqrt(5) * 0.25);
+			print("const auto tr7 = std::fma(tr5, -0.25, zr0);\n");
+			print("const auto tr8 = tr7 + tr6;\n");
+			print("const auto tr9 = tr7 - tr6;\n");
+			print("const auto tr10 = std::fma((%24.17e), tr3, (%24.17e) * tr4);\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
+			print("const auto tr11 = std::fma((%24.17e), tr3, (%24.17e) * tr4);\n", sin(2.0 * M_PI / 10.0), -sin(2.0 * M_PI / 5.0));
+			print("const auto ti1 = zi1 + zi4;\n");
+			print("const auto ti2 = zi2 + zi3;\n");
+			print("const auto ti3 = zi1 - zi4;\n");
+			print("const auto ti4 = zi2 - zi3;\n");
+			print("const auto ti5 = ti1 + ti2;\n");
+			print("const auto ti6 = (%24.17e) * (ti1 - ti2);\n", sqrt(5) * 0.25);
+			print("const auto ti7 = std::fma(ti5, -0.25, zi0);\n");
+			print("const auto ti8 = ti7 + ti6;\n");
+			print("const auto ti9 = ti7 - ti6;\n");
+			print("const auto ti10 = std::fma((%24.17e), ti3, (%24.17e) * ti4);\n", sin(2.0 * M_PI / 5.0), sin(2.0 * M_PI / 10.0));
+			print("const auto ti11 = std::fma((%24.17e), ti3, (%24.17e) * ti4);\n", sin(2.0 * M_PI / 10.0), -sin(2.0 * M_PI / 5.0));
+			print("xp[%i] = zr0 + tr5;\n", 0);
+			print("xm[%i] = zi0 + ti5;\n", 0);
+			print("xp[%i] = tr8 + ti10;\n", N2);
+			print("xm[%i] = ti8 - tr10;\n", -N2);
+			print("xp[%i] = tr9 + ti11;\n", 2 * N2);
+			print("xm[%i] = ti9 - tr11;\n", -2 * N2);
+			print("xm[%i] = tr9 - ti11;\n", -3 * N2);
+			print("xp[%i] = -ti9 - tr11;\n", 3 * N2);
+			print("xm[%i] = tr8 - ti10;\n", -4 * N2);
+			print("xp[%i] = -ti8 - tr10;\n", 4 * N2);
+			break;
+		case 6:
+			print("const auto tr1 = zr2 + zr4;\n");
+			print("const auto ti1 = zi2 + zi4;\n");
+			print("const auto tr2 = std::fma(tr1, -0.5, zr0);\n");
+			print("const auto ti2 = std::fma(ti1, -0.5, zi0);\n");
+			print("const auto tr3 = (%24.17e) * (zr2 - zr4);\n", sin(M_PI / 3.0));
+			print("const auto ti3 = (%24.17e) * (zi2 - zi4);\n", sin(M_PI / 3.0));
+			print("const auto tr4 = zr5 + zr1;\n");
+			print("const auto ti4 = zi5 + zi1;\n");
+			print("const auto tr5 = std::fma(tr4, -0.5, zr3);\n");
+			print("const auto ti5 = std::fma(ti4, -0.5, zi3);\n");
+			print("const auto tr6 = (%24.17e) * (zr5 - zr1);\n", sin(M_PI / 3.0));
+			print("const auto ti6 = (%24.17e) * (zi5 - zi1);\n", sin(M_PI / 3.0));
+			print("const auto tr7 = zr0 + tr1;\n");
+			print("const auto ti7 = zi0 + ti1;\n");
+			print("const auto tr8 = tr2 + ti3;\n");
+			print("const auto ti8 = ti2 - tr3;\n");
+			print("const auto tr9 = tr2 - ti3;\n");
+			print("const auto ti9 = ti2 + tr3;\n");
+			print("const auto tr10 = zr3 + tr4;\n");
+			print("const auto ti10 = zi3 + ti4;\n");
+			print("const auto tr11 = tr5 + ti6;\n");
+			print("const auto ti11 = ti5 - tr6;\n");
+			print("const auto tr12 = tr5 - ti6;\n");
+			print("const auto ti12 = ti5 + tr6;\n");
+			print("xp[%i] = tr7 + tr10;\n", 0);
+			print("xm[%i] = ti7 + ti10;\n", 0);
+			print("xp[%i] = tr8 - tr11;\n", N2);
+			print("xm[%i] = ti8 - ti11;\n", -N2);
+			print("xp[%i] = tr9 + tr12;\n", 2 * N2);
+			print("xm[%i] = ti9 + ti12;\n", -2 * N2);
+			print("xm[%i] = tr7 - tr10;\n", -3 * N2);
+			print("xp[%i] = -ti7 + ti10;\n", 3 * N2);
+			print("xm[%i] = tr8 + tr11;\n", -4 * N2);
+			print("xp[%i] = -ti8 - ti11;\n", 4 * N2);
+			print("xm[%i] = tr9 - tr12;\n", -5 * N2);
+			print("xp[%i] = -ti9 + ti12;\n", 5 * N2);
+			break;
+		case 7: {
+			constexpr double theta = 2.0 * M_PI / 7.0;
+			const double c1 = cos(theta);
+			const double c2 = cos(2.0 * theta);
+			const double c3 = cos(3.0 * theta);
+			const double c4 = sin(theta);
+			const double c5 = sin(2.0 * theta);
+			const double c6 = sin(3.0 * theta);
+			print("const auto tr1 = zr1 + zr6;\n");
+			print("const auto ti1 = zi1 + zi6;\n");
+			print("const auto tr2 = zr2 + zr5;\n");
+			print("const auto ti2 = zi2 + zi5;\n");
+			print("const auto tr3 = zr3 + zr4;\n");
+			print("const auto ti3 = zi3 + zi4;\n");
+			print("const auto tr4 = zr1 - zr6;\n");
+			print("const auto ti4 = zi1 - zi6;\n");
+			print("const auto tr5 = zr2 - zr5;\n");
+			print("const auto ti5 = zi2 - zi5;\n");
+			print("const auto tr6 = zr3 - zr4;\n");
+			print("const auto ti6 = zi3 - zi4;\n");
+			print("const auto tr7 = zr0 - 0.5 * tr3;\n");
+			print("const auto ti7 = zi0 - 0.5 * ti3;\n");
+			print("const auto tr8 = tr1 - tr3;\n");
+			print("const auto ti8 = ti1 - ti3;\n");
+			print("const auto tr9 = tr2 - tr3;\n");
+			print("const auto ti9 = ti2 - ti3;\n");
+			print("const auto yr0 = zr0 + tr1 + tr2 + tr3;\n");
+			print("const auto yi0 = zi0 + ti1 + ti2 + ti3;\n");
+			print("const auto yr1 = std::fma(tr8, %.17e, std::fma(tr9, %.17e, tr7));\n", c1, c2);
+			print("const auto yi1 = std::fma(ti8, %.17e, std::fma(ti9, %.17e, ti7));\n", c1, c2);
+			print("const auto yr2 = std::fma(tr8, %.17e, std::fma(tr9, %.17e, tr7));\n", c2, c3);
+			print("const auto yi2 = std::fma(ti8, %.17e, std::fma(ti9, %.17e, ti7));\n", c2, c3);
+			print("const auto yr3 = std::fma(tr8, %.17e, std::fma(tr9, %.17e, tr7));\n", c3, c1);
+			print("const auto yi3 = std::fma(ti8, %.17e, std::fma(ti9, %.17e, ti7));\n", c3, c1);
+			print("const auto yr4 = std::fma(tr4, %.17e, std::fma(tr5, %.17e, tr6 * %.17e));\n", c6, -c4, c5);
+			print("const auto yi4 = std::fma(ti4, %.17e, std::fma(ti5, %.17e, ti6 * %.17e));\n", c6, -c4, c5);
+			print("const auto yr5 = std::fma(tr4, %.17e, std::fma(tr5, %.17e, tr6 * %.17e));\n", c5, -c6, -c4);
+			print("const auto yi5 = std::fma(ti4, %.17e, std::fma(ti5, %.17e, ti6 * %.17e));\n", c5, -c6, -c4);
+			print("const auto yr6 = std::fma(tr4, %.17e, std::fma(tr5, %.17e, tr6 * %.17e));\n", c4, c5, c6);
+			print("const auto yi6 = std::fma(ti4, %.17e, std::fma(ti5, %.17e, ti6 * %.17e));\n", c4, c5, c6);
+			print("xp[%i] = yr0;\n", 0);
+			print("xm[%i] = yi0;\n", 0);
+			print("xp[%i] = yr1 + yi6;\n", N2);
+			print("xm[%i] = yi1 - yr6;\n", -N2);
+			print("xp[%i] = yr2 + yi5;\n", 2 * N2);
+			print("xm[%i] = yi2 - yr5;\n", -2 * N2);
+			print("xp[%i] = yr3 + yi4;\n", 3 * N2);
+			print("xm[%i] = yi3 - yr4;\n", -3 * N2);
+			print("xm[%i] = yr3 - yi4;\n", -4 * N2);
+			print("xp[%i] = -yi3 - yr4;\n", 4 * N2);
+			print("xm[%i] = yr2 - yi5;\n", -5 * N2);
+			print("xp[%i] = -yi2 - yr5;\n", 5 * N2);
+			print("xm[%i] = yr1 - yi6;\n", -6 * N2);
+			print("xp[%i] = -yi1 - yr6;\n", 6 * N2);
 		}
-		for (int j = 1; j <= (N1 - 1) / 2; j++) {
-			print("const auto txm%i = zr%i - zr%i;\n", j, j, N1 - j);
-		}
-		for (int j = 1; j <= (N1 - 1) / 2; j++) {
-			print("const auto typ%i = zi%i + zi%i;\n", j, j, N1 - j);
-		}
-		for (int j = 1; j <= (N1 - 1) / 2; j++) {
-			print("const auto tym%i = zi%i - zi%i;\n", j, j, N1 - j);
-		}
-		for (int i = 1; i <= (N1 - 1) / 2; i++) {
-			print("auto ap%i = zr0;\n", i);
-			print("auto bp%i = zi0;\n", i);
+			break;
+		case 8:
+			printf("N = %i - real Radix 8\n", N);
+			print("const auto tr1 = zr0 + zr4;\n");
+			print("const auto ti1 = zi0 + zi4;\n");
+			print("const auto tr2 = zr0 - zr4;\n");
+			print("const auto ti2 = zi0 - zi4;\n");
+			print("const auto tr3 = zr1 + zr5;\n");
+			print("const auto ti3 = zi1 + zi5;\n");
+			print("const auto tr4 = zr1 - zr5;\n");
+			print("const auto ti4 = zi1 - zi5;\n");
+			print("const auto tr5 = zr2 + zr6;\n");
+			print("const auto ti5 = zi2 + zi6;\n");
+			print("const auto tr6 = zr2 - zr6;\n");
+			print("const auto ti6 = zi2 - zi6;\n");
+			print("const auto tr7 = zr3 + zr7;\n");
+			print("const auto ti7 = zi3 + zi7;\n");
+			print("const auto tr8 = zr3 - zr7;\n");
+			print("const auto ti8 = zi3 - zi7;\n");
+			print("const auto tr9 = tr1 + tr5;\n");
+			print("const auto ti9 = ti1 + ti5;\n");
+			print("const auto tr10 = tr3 + tr7;\n");
+			print("const auto ti10 = ti3 + ti7;\n");
+			print("const auto tr11 = (%.17e) * (tr4 - tr8);\n", 1.0 / sqrt(2));
+			print("const auto ti11 = (%.17e) * (ti4 - ti8);\n", 1.0 / sqrt(2));
+			print("const auto tr12 = (%.17e) * (tr4 + tr8);\n", 1.0 / sqrt(2));
+			print("const auto ti12 = (%.17e) * (ti4 + ti8);\n", 1.0 / sqrt(2));
+			print("const auto yr0 = tr9 + tr10;\n");
+			print("const auto yi0 = ti9 + ti10;\n");
+			print("const auto yr1 = tr2 + tr11;\n");
+			print("const auto yi1 = ti2 + ti11;\n");
+			print("const auto yr2 = tr1 - tr5;\n");
+			print("const auto yi2 = ti1 - ti5;\n");
+			print("const auto yr3 = tr2 - tr11;\n");
+			print("const auto yi3 = ti2 - ti11;\n");
+			print("const auto yr4 = tr9 - tr10;\n");
+			print("const auto yi4 = ti9 - ti10;\n");
+			print("const auto yr5 = tr12 - tr6;\n");
+			print("const auto yi5 = ti12 - ti6;\n");
+			print("const auto yr6 = tr3 - tr7;\n");
+			print("const auto yi6 = ti3 - ti7;\n");
+			print("const auto yr7 = tr12 + tr6;\n");
+			print("const auto yi7 = ti12 + ti6;\n");
+			print("xp[%i] = yr0;\n", 0);
+			print("xm[%i] = yi0;\n", 0);
+			print("xp[%i] = yr1 + yi7;\n", N2);
+			print("xm[%i] = yi1 - yr7;\n", -N2);
+			print("xp[%i] = yr2 + yi6;\n", 2 * N2);
+			print("xm[%i] = yi2 - yr6;\n", -2 * N2);
+			print("xp[%i] = yr3 + yi5;\n", 3 * N2);
+			print("xm[%i] = yi3 - yr5;\n", -3 * N2);
+			print("xm[%i] = yr4;\n", -4 * N2);
+			print("xp[%i] = -yi4;\n", 4 * N2);
+			print("xm[%i] = yr3 - yi5;\n", -5 * N2);
+			print("xp[%i] = -(yi3 + yr5);\n", 5 * N2);
+			print("xm[%i] = yr2 - yi6;\n", -6 * N2);
+			print("xp[%i] = -(yi2 + yr6);\n", 6 * N2);
+			print("xm[%i] = yr1 - yi7;\n", -7 * N2);
+			print("xp[%i] = -(yi1 + yr7);\n", 7 * N2);
+			break;
+		default:
 			for (int j = 1; j <= (N1 - 1) / 2; j++) {
-				print("ap%i = std::fma(txp%i, (%24.17e), ap%i);\n", i, j, cos(2.0 * M_PI * j * i / N1), i);
-				print("bp%i = std::fma(typ%i, (%24.17e), bp%i);\n", i, j, cos(2.0 * M_PI * j * i / N1), i);
-				if (j == 1) {
-					print("double am%i = tym%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N1));
-					print("double bm%i = txm%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N1));
-				} else {
-					print("am%i = std::fma(tym%i, (%24.17e), am%i);\n", i, j, sin(2.0 * M_PI * j * i / N1), i);
-					print("bm%i = std::fma(txm%i, (%24.17e), bm%i);\n", i, j, sin(2.0 * M_PI * j * i / N1), i);
+				print("const auto txp%i = zr%i + zr%i;\n", j, j, N1 - j);
+			}
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				print("const auto txm%i = zr%i - zr%i;\n", j, j, N1 - j);
+			}
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				print("const auto typ%i = zi%i + zi%i;\n", j, j, N1 - j);
+			}
+			for (int j = 1; j <= (N1 - 1) / 2; j++) {
+				print("const auto tym%i = zi%i - zi%i;\n", j, j, N1 - j);
+			}
+			for (int i = 1; i <= (N1 - 1) / 2; i++) {
+				print("auto ap%i = zr0;\n", i);
+				print("auto bp%i = zi0;\n", i);
+				for (int j = 1; j <= (N1 - 1) / 2; j++) {
+					print("ap%i = std::fma(txp%i, (%24.17e), ap%i);\n", i, j, cos(2.0 * M_PI * j * i / N1), i);
+					print("bp%i = std::fma(typ%i, (%24.17e), bp%i);\n", i, j, cos(2.0 * M_PI * j * i / N1), i);
+					if (j == 1) {
+						print("double am%i = tym%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N1));
+						print("double bm%i = txm%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N1));
+					} else {
+						print("am%i = std::fma(tym%i, (%24.17e), am%i);\n", i, j, sin(2.0 * M_PI * j * i / N1), i);
+						print("bm%i = std::fma(txm%i, (%24.17e), bm%i);\n", i, j, sin(2.0 * M_PI * j * i / N1), i);
+					}
 				}
 			}
+			print("xp[%i] = ", 0);
+			for (int i = 0; i < N1; i++) {
+				print_notab(" + zr%i", i);
+			}
+			print_notab(";\n");
+			print("xm[%i] = ", 0);
+			for (int i = 0; i < N1; i++) {
+				print_notab(" + zi%i", i);
+			}
+			print_notab(";\n");
+			for (int i = 1; i <= (N1 - 1) / 2; i++) {
+				print("xp[%i] = ap%i + am%i;\n", i * N2, i, i);
+				print("xm[%i] = bp%i - bm%i;\n", -i * N2, i, i);
+				print("xm[%i] = ap%i - am%i;\n", -(N1 - i) * N2, i, i);
+				print("xp[%i] = -bp%i - bm%i;\n", (N1 - i) * N2, i, i);
+			}
 		}
-		print("xp[%i] = ", 0);
-		for (int i = 0; i < N1; i++) {
-			print_notab(" + zr%i", i);
-		}
-		print_notab(";\n");
-		print("xm[%i] = ", 0);
-		for (int i = 0; i < N1; i++) {
-			print_notab(" + zi%i", i);
-		}
-		print_notab(";\n");
-		for (int i = 1; i <= (N1 - 1) / 2; i++) {
-			print("xp[%i] = ap%i + am%i;\n", i * N2, i, i);
-			print("xm[%i] = bp%i - bm%i;\n", -i * N2, i, i);
-			print("xm[%i] = ap%i - am%i;\n", -(N1 - i) * N2, i, i);
-			print("xp[%i] = -bp%i - bm%i;\n", (N1 - i) * N2, i, i);
-		}
-	}
-	deindent();
-	print("}\n");
+		deindent();
+		print("}\n");
 
-//	}
+	}
 	if (N2 % 2 == 0) {
 
 		int k2 = N2 / 2;
@@ -1242,7 +1298,15 @@ std::vector<int> fft_bitr_real(int N, int o, std::vector<int> I) {
 	std::vector<int> K;
 	int r = best_radix_real(N).first;
 	if (r < 0) {
-		return I;
+		std::vector<int> I3(N);
+		std::vector<int> I1(N);
+		const auto gq = raders_gq(N);
+		auto I2 = fft_bitreverse_indices_real(N - 1);
+		for (int i = 0; i < I2.size(); i++) {
+			I3[i] = I[gq[I2[i]]];
+		}
+		I3[N - 1] = I[0];
+		return I3;
 	} else {
 		for (int n = 0; n < r; n++) {
 			std::vector<int> J;

@@ -17,7 +17,6 @@
 int fft_nops_real[MAXFFT + 1];
 int fft_nops[MAXFFT + 1];
 
-
 void print_fft(int N) {
 	std::string fname = "fft." + std::to_string(N) + ".cpp";
 	set_file(fname);
@@ -62,21 +61,29 @@ void print_fft_real(int N) {
 
 	print("\nvoid fft_real_%i(double* x, double* y) {\n", N);
 	indent();
-	for (int n = 0; n < NPAR; n++) {
-		print("double tmp%i;\n", n);
-	}
-	fft_bitreverse_real(N);
+	print("fft_bitreverse_real_%i(x);\n", N);
 	print("fft_real_base_%i(x);\n", N);
+	print("for (int n = 1; n < %i; n++) {\n", (N + 1) / 2);
+	indent();
+	print("y[2 * n] = x[n];\n");
+	print("y[2 * n + 1] = x[%i - n];\n", N);
+	deindent();
+	print("}\n");
 	print("y[%i] = x[%i];\n", 0, 0);
 	print("y[%i] = 0;\n", 1);
-	for (int n = 1; n < (N + 1) / 2; n++) {
-		print("y[%i] = x[%i];\n", 2 * n, n);
-		print("y[%i] = x[%i];\n", 2 * n + 1, N - n);
-	}
 	if (N % 2 == 0) {
 		print("y[%i] = x[%i];\n", 2 * (N / 2), N / 2);
 		print("y[%i] = 0;\n", 2 * (N / 2) + 1);
 	}
+	deindent();
+	print("}\n\n");
+
+	print("\nvoid fft_bitreverse_real_%i(double* x) {\n", N);
+	indent();
+	for (int n = 0; n < NPAR; n++) {
+		print("double tmp%i;\n", n);
+	}
+	fft_bitreverse_real(N);
 	deindent();
 	print("}\n\n");
 }
@@ -186,85 +193,6 @@ int main(int argc, char **argv) {
 			"\treturn c;\n"
 			"}\n"
 			"";
-	std::string theader = "template<int N>\n class twiddle_set {\n"
-			"\tstd::vector<std::complex<double>> tws;\n"
-			"public:\n"
-			"\ttwiddle_set() {\n"
-			"\t\ttws.resize(N);\n"
-			"\t\tfor( int n = 0; n < N; n++) {\n"
-			"\t\t\ttws[n] = std::polar(1.0, -2.0 * M_PI * n / N);\n"
-			"\t\t}\n"
-			"\t}\n"
-			"\tinline std::complex<double> operator[](int n) const {\n"
-			"\t\treturn tws[n];\n"
-			"\t}\n"
-			"};\n"
-			"\n"
-			"";
-
-	std::string rheader = "\n"
-			"template<int N>\n"
-			"class raders_twiddles {\n"
-			"\tstd::vector<std::complex<double>> b;\n"
-			"\tlong long mod_pow(long long a, long long b, long long m) {\n"
-			"\t\tlong long rc = 1;\n"
-			"\t\tlong long apow = a;\n"
-			"\t\twhile (b) {\n"
-			"\t\t\tif (b & (long long) 1) {\n"
-			"\t\t\t\trc = ((rc % m) * (apow % m)) % m;\n"
-			"\t\t\t}\n"
-			"\t\t\tb >>= (long long) 1;\n"
-			"\t\t\tapow = ((apow % m) * (apow % m)) % m;\n"
-			"\t\t}\n"
-			"\t\treturn rc;\n"
-			"\t}\n"
-			"\n"
-			"\tint mod_inv(int a, int m) {\n"
-			"\t\treturn mod_pow(a, m - 2, m);\n"
-			"\t}\n"
-			"\tint generator(long long M) {\n"
-			"\t\tfor (long long g = 2; g < 1000; g++) {\n"
-			"\t\t\tstd::vector<bool> I(M, false);\n"
-			"\t\t\tbool fail = false;\n"
-			"\t\t\tfor (long long m = 0; m < M - (long long) 1; m++) {\n"
-			"\t\t\t\tlong long n = mod_pow(g, m, M);\n"
-			"\t\t\t\tif (!I[n]) {\n"
-			"\t\t\t\t\tI[n] = true;\n"
-			"\t\t\t\t} else {\n"
-			"\t\t\t\t\tfail = true;\n"
-			"\t\t\t\t\tbreak;\n"
-			"\t\t\t\t}\n"
-			"\t\t\t}\n"
-			"\t\t\tif (!fail) {\n"
-			"\t\t\t\treturn g;\n"
-			"\t\t\t}\n"
-			"\t\t}\n"
-			"\t\tprintf(\"Unable to find primitive root!\\n\");\n"
-			"\t\tabort();\n"
-			"\t}\n"
-			"\tstd::vector<int> raders_ginvq(int n) {\n"
-			"\t\tconst int g = generator(n);\n"
-			"\t\tstd::vector<int> ginvq;\n"
-			"\t\tfor (int q = 0; q < n - 1; q++) {\n"
-			"\t\t\tginvq.push_back(mod_inv(mod_pow(g, q, n), n));\n"
-			"\t\t}\n"
-			"\t\treturn ginvq;\n"
-			"\t}\n"
-			"public:\n"
-			"\traders_twiddles() {\n"
-			"\t\tb.resize(N - 1);\n"
-			"\t\tconst auto ginvq = raders_ginvq(N);\n"
-			"\t\tfor (int q = 0; q < N - 1; q++) {\n"
-			"\t\t\tb[q] = std::polar(1.0, -2.0 * M_PI * ginvq[q] / N);\n"
-			"\t\t}\n"
-			"\t\tFFT(b.data(), N - 1);\n"
-			"\t}\n"
-			"\tinline std::complex<double> operator[](int i) const {\n"
-			"\t\treturn b[i];\n"
-			"\t}\n"
-			"};\n"
-			"\n"
-			"";
 
 	print("%s\n", header4.c_str());
 	print("%s\n", header5.c_str());
@@ -272,8 +200,6 @@ int main(int argc, char **argv) {
 	print("%s\n", header51.c_str());
 	print("%s\n", header42.c_str());
 	print("%s\n", header52.c_str());
-	print("%s\n", theader.c_str());
-	print("%s\n", rheader.c_str());
 	for (int n = 2; n <= MAXFFT; n += DFFT) {
 		print("void fft_base_%i(double*);\n", n);
 	}
@@ -281,15 +207,19 @@ int main(int argc, char **argv) {
 		print("void fft_real_base_%i(double*);\n", n);
 	}
 	for (int n = 2; n <= MAXFFT; n += DFFT) {
+		print("void fft_bitreverse_real_%i(double*);\n", n);
+	}
+	for (int n = 2; n <= MAXFFT; n += DFFT) {
 		print("void fft_%i(double*);\n", n);
 	}
 	for (int n = 2; n <= MAXFFT; n++) {
 		print("void fft_real_%i(double*, double*);\n", n);
 	}
+	include("../gen_src/header.hpp");
 	print("\n");
 
 	set_file("fft.cpp");
-	printf( "Hello World\n");
+	printf("Hello World\n");
 	print("#include \"fft.hpp\"\n\n");
 
 	print("\n"

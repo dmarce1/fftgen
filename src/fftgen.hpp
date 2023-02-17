@@ -22,7 +22,8 @@
 constexpr int NPAR = 4;
 #define MAXFFT 128
 #define DFFT 1
-#define LOOP_N 128
+#define LOOP_N 100
+#define RADER_LEN 24
 
 struct fft_type {
 	int type;
