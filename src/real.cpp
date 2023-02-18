@@ -259,11 +259,11 @@ std::pair<int, int> best_radix_real(int N) {
 	if (N % 7 == 0) {
 		return std::make_pair(7, 0);
 	}
-	if (N % 6 == 0) {
-		return std::make_pair(6, 0);
-	}
 	if (N % 9 == 0) {
 		return std::make_pair(9, 0);
+	}
+	if (N % 6 == 0) {
+		return std::make_pair(6, 0);
 	}
 	int twopow = 0;
 	int n = N;
