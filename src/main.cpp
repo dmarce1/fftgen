@@ -292,8 +292,8 @@ int main(int argc, char **argv) {
 
 	set_file("Makefile");
 	print("CC=g++\n");
-//	print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
-	print("CFLAGS=-I. -Ofast -march=native\n");
+	print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
+//	print("CFLAGS=-I. -Ofast -march=native\n");
 	print("DEPS = fft.hpp\n");
 	print("OBJ = fft.o ");
 	for (int n = 2; n <= MAXFFT; n += DFFT) {
