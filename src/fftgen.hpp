@@ -20,7 +20,7 @@
 #define COOLEY 3
 #define MWEIGHT (1.5)
 constexpr int NPAR = 4;
-#define MAXFFT 128
+#define MAXFFT 256
 #define DFFT 1
 #define LOOP_N 100
 #define RADER_LEN 24
