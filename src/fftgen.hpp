@@ -20,7 +20,7 @@
 #define COOLEY 3
 #define MWEIGHT (1.5)
 constexpr int NPAR = 4;
-#define MAXFFT 256
+#define MAXFFT 128
 #define DFFT 1
 #define LOOP_N 100
 #define RADER_LEN 24
@@ -33,7 +33,8 @@ struct fft_type {
 	int nops;
 };
 
-
+void print_complex_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
+void print_real_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
 void fft_real(int N);
 void indent();
 void deindent();

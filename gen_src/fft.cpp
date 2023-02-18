@@ -532,7 +532,6 @@ void test() {
 	}
 	tm3.reset();
 	tm4.reset();
-	return;
 	printf("\nreal\n");
 	for (int N = 2; N <= MAXFFT; N += 1) {
 		if (!allow_real(N)) {
