@@ -256,12 +256,6 @@ std::vector<int> factors(int N) {
 
 std::pair<int, int> best_radix_real(int N) {
 	const int rader_radix = is_prime(N) ? RADER_LEN : 1000000000;
-	if (N % 7 == 0) {
-		return std::make_pair(7, 0);
-	}
-	if (N % 9 == 0) {
-		return std::make_pair(9, 0);
-	}
 	if (N % 6 == 0) {
 		return std::make_pair(6, 0);
 	}
