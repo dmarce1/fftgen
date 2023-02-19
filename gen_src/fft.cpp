@@ -540,7 +540,7 @@ void test() {
 		timer tm1, tm2;
 		double err;
 		double max;
-		for (int ti = 0; ti < 1; ti++) {
+		for (int ti = 0; ti < 256; ti++) {
 			err = 0.0;
 			max = 0.0;
 			std::vector<std::complex<double>> X(N / 2 + 1);
@@ -567,7 +567,7 @@ void test() {
 			}
 			for (int n = 0; n < N / 2 + 1; n++) {
 				err += std::abs(Y[n]) * std::abs(Y[n]);
-				printf("%i %16.6e %16.6e %16.6e %16.6e\n", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());
+			//	printf("%i %16.6e %16.6e %16.6e %16.6e\n", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());
 				max = std::max(max, std::abs(X[n]));
 			}
 			err = sqrt(err / N) / max;
