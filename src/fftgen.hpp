@@ -23,7 +23,8 @@ constexpr int NPAR = 4;
 #define MAXFFT 128
 #define DFFT 1
 #define LOOP_N 100
-#define RADER_LEN 24
+#define SMALL_MAX 15
+#define RADER_LEN 28
 
 struct fft_type {
 	int type;
@@ -38,9 +39,9 @@ struct fft_type {
 std::vector<std::pair<int, int>> prime_factorization(int N);
 std::vector<std::pair<int, int>> fft_factorization(int N);
 std::string fft_factorization_string(int N);
-void print_complex_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
-void print_real_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
-void print_skew_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
+int print_complex_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
+int print_real_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
+int print_skew_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
 void fft_real(int N);
 void indent();
 void deindent();

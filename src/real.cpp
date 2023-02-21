@@ -255,6 +255,14 @@ std::vector<int> factors(int N) {
 }
 
 std::pair<int, int> best_radix_real(int N) {
+
+	auto facs = fft_factorization(N);
+	int radix = facs[0].first;
+	if (radix < RADER_LEN) {
+		return std::make_pair(radix, 0);
+	} else {
+		return std::make_pair(-1, 0);
+	}
 	const int rader_radix = is_prime(N) ? RADER_LEN : 1000000000;
 	if (N % 15 == 0) {
 		return std::make_pair(15, 0);

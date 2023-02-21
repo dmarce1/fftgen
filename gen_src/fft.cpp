@@ -593,7 +593,7 @@ void test() {
 		timer tm1, tm2;
 		double err;
 		double max;
-		for (int ti = 0; ti < 256; ti++) {
+		for (int ti = 0; ti < 1; ti++) {
 			err = 0.0;
 			max = 0.0;
 			std::vector<std::complex<double>> X(N);

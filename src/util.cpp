@@ -19,10 +19,10 @@ std::string to_str(std::complex<double> z) {
 
 int greatest_fft_factor(int N) {
 	int gprime = greatest_prime_factor(N);
-	if (gprime > 15) {
+	if (gprime > SMALL_MAX) {
 		return gprime;
 	} else {
-		for (int i = 15; i >= 2; i--) {
+		for (int i = SMALL_MAX; i >= 2; i--) {
 			if (N % i == 0) {
 				return i;
 			}
