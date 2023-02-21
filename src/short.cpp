@@ -1,7 +1,6 @@
 #include "fftgen.hpp"
 
 void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::string> out_, bool real = false) {
-	print("/* begin short transform - %s - length %i */\n", real ? "real" : "complex", N);
 	std::vector<const char*> in(in_.size());
 	std::vector<const char*> out(out_.size());
 	for (int i = 0; i < in.size(); i++) {
@@ -11,6 +10,7 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 
 	auto pfac = prime_factorization(N);
 	if (pfac.size() == 1) {
+		print("/* begin short transform - %s - length %i */\n", real ? "real" : "complex", N);
 		std::vector<int> ri(N);
 		std::vector<int> ii(N);
 		if (real) {
@@ -256,148 +256,148 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 				print("%s = -bm%i;\n", out[ii[i]], i, i);
 			}
 		}
-	} else if (real) {
-		int N2 = pow(pfac[0].first, pfac[0].second);
-		int N1 = N / N2;
-		std::vector<std::vector<std::string>> in1(N2, std::vector<std::string>(N1));
-		std::vector<std::vector<std::string>> out1(N2, std::vector<std::string>(N1));
-		std::vector<std::vector<std::string>> out2(N1 / 2 + 1, std::vector<std::string>(2 * N2));
-		std::vector<std::vector<std::string>> in2(N1 / 2 + 1, std::vector<std::string>(2 * N2));
-		for (int n1 = 0; n1 < N1; n1++) {
+	} else {
+		if (real) {
+			int N2 = pow(pfac[0].first, pfac[0].second);
+			int N1 = N / N2;
+			print("/* begin compound short transform - %s - length %i = %i x %i */\n", real ? "real" : "complex", N, N1, N2);
+			std::vector<std::vector<std::string>> in1(N2, std::vector<std::string>(N1));
+			std::vector<std::vector<std::string>> out1(N2, std::vector<std::string>(N1));
+			std::vector<std::vector<std::string>> out2(N1 / 2 + 1, std::vector<std::string>(2 * N2));
+			std::vector<std::vector<std::string>> in2(N1 / 2 + 1, std::vector<std::string>(2 * N2));
+			for (int n1 = 0; n1 < N1; n1++) {
+				for (int n2 = 0; n2 < N2; n2++) {
+					const int nn = ((n1 * N2 + n2 * N1) % N);
+					in1[n2][n1] = in[nn];
+				}
+			}
+			print("double zr0, ");
+			for (int n = 1; n < N - 1; n++) {
+				print_notab("zr%i, ", n);
+			}
+			print_notab("zr%i;\n", N - 1);
+			print("double ");
+			for (int n = 1; n < N - 2; n++) {
+				print_notab("zi%i, ", n);
+			}
+			print_notab("zi%i;\n", N - 2);
 			for (int n2 = 0; n2 < N2; n2++) {
-				const int nn = ((n1 * N2 + n2 * N1) % N);
-				in1[n2][n1] = in[nn];
-			}
-		}
-		print("double zr0, ");
-		for (int n = 1; n < N - 1; n++) {
-			print_notab("zr%i, ", n);
-		}
-		print_notab("zr%i;\n", N - 1);
-		print("double ");
-		for (int n = 1; n < N - 2; n++) {
-			print_notab("zi%i, ", n);
-		}
-		print_notab("zi%i;\n", N - 2);
-		for (int n2 = 0; n2 < N2; n2++) {
-			out1[n2][0] = std::string("zr") + std::to_string(n2 * N1);
-			for (int n1 = 1; n1 < N1 / 2 + 1; n1++) {
-				const int nn = ((n1 * N2 + n2 * N1) % N);
-				out1[n2][n1] = std::string("zr") + std::to_string(n2 * N1 + n1);
-				if (n1 != N1 - n1) {
-					out1[n2][N1 - n1] = std::string("zi") + std::to_string(n2 * N1 + n1);
-				}
-			}
-		}
-		for (int n2 = 0; n2 < N2; n2++) {
-			in2[0][n2] = out1[n2][0];
-			for (int n1 = 1; n1 < N1 / 2 + 1; n1++) {
-				in2[n1][2 * n2] = out1[n2][n1];
-				in2[n1][2 * n2 + 1] = out1[n2][N1 - n1];
-			}
-		}
-		std::vector<std::string> negs;
-		for (int n = 0; n < N; n++) {
-			int n1 = n % N1;
-			int n2 = n % N2;
-			if (n1 == 0) {
-				if (n2 > N2 / 2) {
-					out2[n1][n2] = out[std::max(n, N - n)];
-					negs.push_back(out[std::max(n, N - n)]);
-				} else {
-					out2[n1][n2] = out[std::min(n, N - n)];
-				}
-			} else if (n1 < N1 / 2 + 1) {
-				out2[n1][2 * n2] = out[std::min(n, N - n)];
-				if (n != 0) {
-					out2[n1][2 * n2 + 1] = out[std::max(n, N - n)];
-					if (n > N - n) {
-						negs.push_back(out[n]);
+				out1[n2][0] = std::string("zr") + std::to_string(n2 * N1);
+				for (int n1 = 1; n1 < N1 / 2 + 1; n1++) {
+					const int nn = ((n1 * N2 + n2 * N1) % N);
+					out1[n2][n1] = std::string("zr") + std::to_string(n2 * N1 + n1);
+					if (n1 != N1 - n1) {
+						out1[n2][N1 - n1] = std::string("zi") + std::to_string(n2 * N1 + n1);
 					}
 				}
 			}
-
-		}
-		for (int n2 = 0; n2 < N2; n2++) {
-			print("{\n");
-			indent();
-			print_real_short_fft(N1, in1[n2], out1[n2]);
-			deindent();
-			print("}\n");
-		}
-		{
-			int n1 = 0;
-			print("{\n");
-			indent();
-			print_real_short_fft(N2, in2[n1], out2[n1]);
-			deindent();
-			print("}\n");
-		}
-		for (int n1 = 1; n1 < N1 / 2 + 1; n1++) {
-			print("{\n");
-			indent();
-			print_complex_short_fft(N2, in2[n1], out2[n1]);
-			deindent();
-			print("}\n");
-		}
-		for (int l = 0; l < negs.size(); l++) {
-			print("%s = -%s;\n", negs[l].c_str(), negs[l].c_str());
-		}
-	} else {
-		int N1 = pow(pfac[0].first, pfac[0].second);
-		int N2 = N / N1;
-		if (N == 12) {
-			printf("12 =  %i %i\n", N1, N2);
-		}
-
-		print("double qr0, ");
-		for (int n = 1; n < N - 1; n++) {
-			print_notab("qr%i, ", n);
-		}
-		print_notab("qr%i;\n", N - 1);
-		print("double qi0, ");
-		for (int n = 1; n < N - 1; n++) {
-			print_notab("qi%i, ", n);
-		}
-		print_notab("qi%i;\n", N - 1);
-		std::vector<std::vector<std::string>> out1(N2, std::vector<std::string>(2 * N1));
-		std::vector<std::vector<std::string>> in1(N2, std::vector<std::string>(2 * N1));
-		std::vector<std::vector<std::string>> out2(N1, std::vector<std::string>(2 * N2));
-		std::vector<std::vector<std::string>> in2(N1, std::vector<std::string>(2 * N2));
-		for (int n1 = 0; n1 < N1; n1++) {
 			for (int n2 = 0; n2 < N2; n2++) {
-				const int nn = ((n1 * N2 + n2 * N1) % N);
-				in1[n2][2 * n1] = in[2 * nn];
-				in1[n2][2 * n1 + 1] = in[2 * nn + 1];
-				out1[n2][2 * n1] = std::string("qr") + std::to_string(n1 + n2 * N1);
-				out1[n2][2 * n1 + 1] = std::string("qi") + std::to_string(n1 + n2 * N1);
-				in2[n1][2 * n2] = std::string("qr") + std::to_string(n1 + n2 * N1);
-				in2[n1][2 * n2 + 1] = std::string("qi") + std::to_string(n1 + n2 * N1);
+				in2[0][n2] = out1[n2][0];
+				for (int n1 = 1; n1 < N1 / 2 + 1; n1++) {
+					in2[n1][2 * n2] = out1[n2][n1];
+					in2[n1][2 * n2 + 1] = out1[n2][N1 - n1];
+				}
+			}
+			std::vector<std::string> negs;
+			for (int n = 0; n < N; n++) {
+				int n1 = n % N1;
+				int n2 = n % N2;
+				if (n1 == 0) {
+					if (n2 > N2 / 2) {
+						out2[n1][n2] = out[std::max(n, N - n)];
+						negs.push_back(out[std::max(n, N - n)]);
+					} else {
+						out2[n1][n2] = out[std::min(n, N - n)];
+					}
+				} else if (n1 < N1 / 2 + 1) {
+					out2[n1][2 * n2] = out[std::min(n, N - n)];
+					if (n != 0) {
+						out2[n1][2 * n2 + 1] = out[std::max(n, N - n)];
+						if (n > N - n) {
+							negs.push_back(out[n]);
+						}
+					}
+				}
+
+			}
+			for (int n2 = 0; n2 < N2; n2++) {
+				print("{\n");
+				indent();
+				print_real_short_fft(N1, in1[n2], out1[n2]);
+				deindent();
+				print("}\n");
+			}
+			{
+				int n1 = 0;
+				print("{\n");
+				indent();
+				print_real_short_fft(N2, in2[n1], out2[n1]);
+				deindent();
+				print("}\n");
+			}
+			for (int n1 = 1; n1 < N1 / 2 + 1; n1++) {
+				print("{\n");
+				indent();
+				print_complex_short_fft(N2, in2[n1], out2[n1]);
+				deindent();
+				print("}\n");
+			}
+			for (int l = 0; l < negs.size(); l++) {
+				print("%s = -%s;\n", negs[l].c_str(), negs[l].c_str());
+			}
+		} else {
+			int N1 = pow(pfac[0].first, pfac[0].second);
+			int N2 = N / N1;
+			print("/* begin compound short transform - %s - length %i = %i x %i */\n", real ? "real" : "complex", N, N1, N2);
+
+			print("double qr0, ");
+			for (int n = 1; n < N - 1; n++) {
+				print_notab("qr%i, ", n);
+			}
+			print_notab("qr%i;\n", N - 1);
+			print("double qi0, ");
+			for (int n = 1; n < N - 1; n++) {
+				print_notab("qi%i, ", n);
+			}
+			print_notab("qi%i;\n", N - 1);
+			std::vector<std::vector<std::string>> out1(N2, std::vector<std::string>(2 * N1));
+			std::vector<std::vector<std::string>> in1(N2, std::vector<std::string>(2 * N1));
+			std::vector<std::vector<std::string>> out2(N1, std::vector<std::string>(2 * N2));
+			std::vector<std::vector<std::string>> in2(N1, std::vector<std::string>(2 * N2));
+			for (int n1 = 0; n1 < N1; n1++) {
+				for (int n2 = 0; n2 < N2; n2++) {
+					const int nn = ((n1 * N2 + n2 * N1) % N);
+					in1[n2][2 * n1] = in[2 * nn];
+					in1[n2][2 * n1 + 1] = in[2 * nn + 1];
+					out1[n2][2 * n1] = std::string("qr") + std::to_string(n1 + n2 * N1);
+					out1[n2][2 * n1 + 1] = std::string("qi") + std::to_string(n1 + n2 * N1);
+					in2[n1][2 * n2] = std::string("qr") + std::to_string(n1 + n2 * N1);
+					in2[n1][2 * n2 + 1] = std::string("qi") + std::to_string(n1 + n2 * N1);
+				}
+			}
+			for (int n = 0; n < N; n++) {
+				int n1 = n % N1;
+				int n2 = n % N2;
+				out2[n1][2 * n2] = out[2 * n];
+				out2[n1][2 * n2 + 1] = out[2 * n + 1];
+			}
+			for (int n2 = 0; n2 < N2; n2++) {
+				print("{\n");
+				indent();
+				print_complex_short_fft(N1, in1[n2], out1[n2]);
+				deindent();
+				print("}\n");
+			}
+			for (int n1 = 0; n1 < N1; n1++) {
+				print("{\n");
+				indent();
+				print_complex_short_fft(N2, in2[n1], out2[n1]);
+				deindent();
+				print("}\n");
 			}
 		}
-		for (int n = 0; n < N; n++) {
-			int n1 = n % N1;
-			int n2 = n % N2;
-			out2[n1][2 * n2] = out[2 * n];
-			out2[n1][2 * n2 + 1] = out[2 * n + 1];
-		}
-		for (int n2 = 0; n2 < N2; n2++) {
-			print("{\n");
-			indent();
-			print_complex_short_fft(N1, in1[n2], out1[n2]);
-			deindent();
-			print("}\n");
-		}
-		for (int n1 = 0; n1 < N1; n1++) {
-			print("{\n");
-			indent();
-			print_complex_short_fft(N2, in2[n1], out2[n1]);
-			deindent();
-			print("}\n");
-		}
 	}
-	print("/* end short transform - %s - length %i */\n", real ? "real" : "complex", N);
-
+	print("/* end short transform */\n");
 }
 
 void print_complex_short_fft(int N, std::vector<std::string> in_, std::vector<std::string> out_) {
@@ -767,39 +767,46 @@ void print_skew_short_fft(int N1, std::vector<std::string> in_, std::vector<std:
 		in[i] = in_[i].c_str();
 		out[i] = out_[i].c_str();
 	}
-	if (N1 % 2 == 0 && N1 > 4) {
+	if (N1 == 2) {
+		for (int k1 = 0; k1 < N1; k1++) {
+			print("const auto x%i = %s;\n", k1, in[k1]);
+		}
+		print("%s = x0;\n", out[0]);
+		print("%s = -x1;\n", out[1]);
+	} else if (N1 % 2 == 0) {
+		int N = N1;
 		std::vector<std::string> in1(N1 / 2);
 		std::vector<std::string> in2(N1 / 2);
 		std::vector<std::string> out1(N1 / 2);
 		std::vector<std::string> out2(N1 / 2);
-		print("double ar%i", 0);
+		print("double a%ir%i", N, 0);
 		for (int n = 1; n < N1 / 2; n++) {
-			print_notab(", ar%i", n);
+			print_notab(", a%ir%i", N, n);
 		}
 		print_notab(";\n");
-		print("double ai%i", 0);
+		print("double a%ii%i", N, 0);
 		for (int n = 1; n < N1 / 2; n++) {
-			print_notab(", ai%i", n);
+			print_notab(", a%ii%i", N, n);
 		}
 		print_notab(";\n");
 		if ((N1 / 2) % 2 == 1) {
-			print("double ar%i;\n", N1 / 2);
-			print("double ai%i;\n", N1 / 2);
+			print("double a%ir%i;\n", N, N1 / 2);
+			print("double a%ii%i;\n", N, N1 / 2);
 		}
 		for (int n = 0; n < N1 / 2; n++) {
 			in1[n] = in_[2 * n];
 			in2[n] = in_[2 * n + 1];
 		}
 		for (int n = 0; n < N1 / 4; n++) {
-			out1[n] = std::string("ar") + std::to_string(2 * n);
-			out1[N1 / 2 - n - 1] = std::string("ai") + std::to_string(2 * n);
-			out2[n] = std::string("ar") + std::to_string(2 * n + 1);
-			out2[N1 / 2 - n - 1] = std::string("ai") + std::to_string(2 * n + 1);
+			out1[n] = std::string("a") + std::to_string(N) + "r" + std::to_string(2 * n);
+			out1[N1 / 2 - n - 1] = std::string("a") + std::to_string(N) + "i" + std::to_string(2 * n);
+			out2[n] = std::string("a") + std::to_string(N) + "r" + std::to_string(2 * n + 1);
+			out2[N1 / 2 - n - 1] = std::string("a") + std::to_string(N) + "i" + std::to_string(2 * n + 1);
 		}
 		if ((N1 / 2) % 2 == 1) {
 			int n = N1 / 4;
-			out1[n] = std::string("ar") + std::to_string(2 * n);
-			out2[n] = std::string("ar") + std::to_string(2 * n + 1);
+			out1[n] = std::string("a") + std::to_string(N) + "r" + std::to_string(2 * n);
+			out2[n] = std::string("a") + std::to_string(N) + "r" + std::to_string(2 * n + 1);
 		}
 		print("{\n");
 		indent();
@@ -814,29 +821,26 @@ void print_skew_short_fft(int N1, std::vector<std::string> in_, std::vector<std:
 		for (int k = 0; k < N1 / 4; k++) {
 			auto tw = std::polar(1.0, -2.0 * M_PI * (k + 0.5) / N1);
 			int n = 2 * k + 1;
-			print("tmp0 = ar%i;\n", n, n);
-			print("ar%i = std::fma((%.17e), ar%i, (%.17e) * ai%i);\n", n, tw.real(), n, -tw.imag(), n);
-			print("ai%i = std::fma((%.17e), ai%i, (%.17e) * tmp0);\n", n, tw.real(), n, tw.imag());
+			print("tmp0 = a%ir%i;\n", N, n);
+			print("a%ir%i = std::fma((%.17e), a%ir%i, (%.17e) * a%ii%i);\n", N, n, tw.real(), N, n, -tw.imag(), N, n);
+			print("a%ii%i = std::fma((%.17e), a%ii%i, (%.17e) * tmp0);\n", N, n, tw.real(), N, n, tw.imag());
 		}
 		for (int n = 0; n < N1 / 4; n++) {
-			print("%s = ar%i + ar%i;\n", out[n], 2 * n, 2 * n + 1);
-			print("%s = ai%i + ai%i;\n", out[N1 - n - 1], 2 * n, 2 * n + 1);
+			print("%s = a%ir%i + a%ir%i;\n", out[n], N, 2 * n, N, 2 * n + 1);
+			print("%s = a%ii%i + a%ii%i;\n", out[N1 - n - 1], N, 2 * n, N, 2 * n + 1);
 		}
 		int beg = N1 / 4;
 		if ((N1 / 2) % 2 != 0) {
 			int n = N1 / 4;
-			print("%s = ar%i;\n", out[n], N1 - 2 * n - 2);
-			print("%s = -ar%i;\n", out[N1 - n - 1], N1 - 2 * n - 1);
+			print("%s = a%ir%i;\n", out[n], N, N1 - 2 * n - 2);
+			print("%s = -a%ir%i;\n", out[N1 - n - 1], N, N1 - 2 * n - 1);
 			beg++;
 		}
 		for (int n = beg; n < N1 / 2; n++) {
-			print("%s = ar%i - ar%i;\n", out[n], N1 - 2 * n - 2, N1 - 2 * n - 1);
-			print("%s = -ai%i + ai%i;\n", out[N1 - n - 1], N1 - 2 * n - 2, N1 - 2 * n - 1);
+			print("%s = a%ir%i - a%ir%i;\n", out[n], N, N1 - 2 * n - 2, N, N1 - 2 * n - 1);
+			print("%s = -a%ii%i + a%ii%i;\n", out[N1 - n - 1], N, N1 - 2 * n - 2, N, N1 - 2 * n - 1);
 		}
-		print("/* end short transform - shifted conjugate symmetric - length %i */\n", N1);
-		return;
-	}
-	if (N1 % 2 == 1 && N1 > 4) {
+	} else {
 		for (int n = 0; n < N1; n += 2) {
 			print("const auto a%i = %s;\n", n / 2, in[n]);
 			in1[n / 2] = std::string("a") + std::to_string(n / 2);
@@ -864,10 +868,9 @@ void print_skew_short_fft(int N1, std::vector<std::string> in_, std::vector<std:
 		for (int n = 0; n < (N1) / 4; n++) {
 			print("%s = -%s;\n", out[N1 - n - 1 - (N1 + 1) / 4], out[N1 - n - 1 - (N1 + 1) / 4]);
 		}
-		print("/* end short transform - shifted conjugate symmetric - length %i */\n", N1);
-		return;
 	}
-
+	print("/* end short transform */\n");
+	return;
 	switch (N1) {
 	case 1:
 		return;
@@ -936,6 +939,6 @@ void print_skew_short_fft(int N1, std::vector<std::string> in_, std::vector<std:
 		abort();
 
 	}
-	print("/* end short transform - shifted conjugate symmetric - length %i */\n", N1);
+	print("/* end short transform  */\n");
 }
 
