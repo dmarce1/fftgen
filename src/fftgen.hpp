@@ -33,6 +33,11 @@ struct fft_type {
 	int nops;
 };
 
+
+
+std::vector<std::pair<int, int>> prime_factorization(int N);
+std::vector<std::pair<int, int>> fft_factorization(int N);
+std::string fft_factorization_string(int N);
 void print_complex_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
 void print_real_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
 void print_skew_short_fft(int r, std::vector<std::string> in_, std::vector<std::string> out_);
@@ -80,6 +85,7 @@ int print_z_opcnt(int zi, int k, int r, int N);
 fft_type best_radix(int N, int o, bool first = false);
 std::vector<int> gt2_fft_bitr(int N1, int N2, int o, std::vector<int> I);
 std::vector<int> fft_bitr(int N, int o, std::vector<int> indices, bool first = false);
+void fft_radix_dit_strided(int r, int N, int o, int s);
 
 template<class ... Args>
 void print(const char* fstr, Args ...args) {

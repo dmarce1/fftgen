@@ -310,7 +310,6 @@ void fft_radix(int r, int N, int o) {
 	return fft_radix_dit(r, N, o);
 }
 
-
 void fft_radix_dit(int r, int N, int o) {
 	print("{\n");
 	print("// radix - %i\n", r);
@@ -324,7 +323,7 @@ void fft_radix_dit(int r, int N, int o) {
 	}
 	if (N >= LOOP_N) {
 		if (N / r > 1) {
-			print("static twiddle_set<%i> twiddles;\n", N);
+			print("static twiddle_set twiddles(%i);\n", N);
 			print("for( int n1 = 1; n1 < %i; n1++ ) {\n", r);
 			indent();
 			print("const int n1N2 = n1 * %i;\n", N / r);
@@ -351,22 +350,6 @@ void fft_radix_dit(int r, int N, int o) {
 			ii = index(o, k + n * N / r, 1, N / r);
 			int tmpi = i % NPAR;
 			if (k * n == 0) {
-			} else if (k * n == N / 8 && N % 8 == 0) {
-				print("tmp%i = x[%i];\n", tmpi, ir);
-				print("x[%i] = M_SQRT1_2 * (x[%i] + x[%i]);\n", ir, ir, ii);
-				print("x[%i] = -M_SQRT1_2 * (tmp%i - x[%i]);\n", ii, tmpi, ii);
-			} else if (k * n == 3 * N / 8 && N % 8 == 0) {
-				print("tmp%i = x[%i];\n", tmpi, ir);
-				print("x[%i] = -M_SQRT1_2 * (x[%i] - x[%i]);\n", ir, ir, ii);
-				print("x[%i] = -M_SQRT1_2 * (tmp%i + x[%i]);\n", ii, tmpi, ii);
-			} else if (k * n == 7 * N / 8 && N % 8 == 0) {
-				print("tmp%i = x[%i];\n", tmpi, ir);
-				print("x[%i] = M_SQRT1_2 * (x[%i] - x[%i]);\n", ir, ir, ii);
-				print("x[%i] = M_SQRT1_2 * (tmp%i + x[%i]);\n", ii, tmpi, ii);
-			} else if (k * n == 5 * N / 8 && N % 8 == 0) {
-				print("tmp%i = x[%i];\n", tmpi, ir);
-				print("x[%i] = -M_SQRT1_2 * (x[%i] + x[%i]);\n", ir, ir, ii);
-				print("x[%i] = M_SQRT1_2 * (tmp%i - x[%i]);\n", ii, tmpi, ii);
 			} else if (k * n == N / 4 && N % 4 == 0) {
 				print("std::swap(x[%i], x[%i]);\n", ir, ii);
 				print("x[%i] = -x[%i];\n", ii, ii);
@@ -408,58 +391,117 @@ void fft_radix_dit(int r, int N, int o) {
 	print("}\n");
 }
 
-fft_type best_radix(int N, int o, bool first) {
-	fft_type fftt;
-	fftt.type = RADIX;
-	fftt.nops = 0;
-	const int rader_radix = is_prime(N) ? RADER_LEN : 1000000000;
-	if (N % 15 == 0) {
-		fftt.N1 = 15;
-	} else if (N % 14 == 0) {
-		fftt.N1 = 14;
-	} else if (N % 12 == 0) {
-		fftt.N1 = 12;
-	} else if (N % 10 == 0) {
-		fftt.N1 = 10;
-	} else if (N % 6 == 0) {
-		fftt.N1 = 6;
+void fft_radix_dit_strided(int r, int N, int o, int s) {
+	print("{\n");
+	print("// radix - %i\n", r);
+	indent();
+	if (N > r) {
+		int R = best_radix(N / r, 0).N1;
+		for (int n = 0; n < r; n++) {
+			fft_radix_dit_strided(R, N / r, n * N / r, s);
+		}
+	}
+	if (N >= LOOP_N) {
+		if (N / r > 1) {
+			print("static twiddle_set twiddles(%i);\n", N);
+			print("for( int n1 = 1; n1 < %i; n1++ ) {\n", r);
+			indent();
+			print("const int n1N2 = n1 * %i;\n", N / r);
+			print("for( int k2 = 1; k2 < %i; k2++ ) {\n", N / r);
+			indent();
+			print("const int i = n1N2 + k2;\n");
+			print("const auto tw = twiddles[n1 * k2];\n");
+			print("const int ir = %i * i;\n", 2 * s + 2 * o);
+			print("const int ii = ir + 1;\n");
+			print("tmp0 = x[ir];\n");
+			print("x[ir] = x[ir] * tw.real() - x[ii] * tw.imag();\n");
+			print("x[ii] = std::fma(tmp0, tw.imag(), x[ii] * tw.real());\n");
+			deindent();
+			print("}\n");
+			deindent();
+			print("}\n");
+		}
 	} else {
-		int twopow = 0;
-		int n = N;
-		while (n % 2 == 0) {
-			twopow++;
-			n /= 2;
-		}
-		if (false && twopow >= 4 && twopow % 4 == 0) {
-			fftt.N1 = 16;
-		} else if (twopow >= 3 && twopow % 3 == 0) {
-			fftt.N1 = 8;
-		} else if (twopow >= 2 && twopow % 2 == 0) {
-			fftt.N1 = 4;
-		} else {
-			int threepow = 0;
-			int n = N;
-			while (n % 3 == 0) {
-				threepow++;
-				n /= 3;
-			}
-			if (false && threepow >= 2 && threepow % 2 == 0) {
-				fftt.N1 = 9;
+		for (int i = 0; i < N; i++) {
+			const int k = i % (N / r);
+			const int n = i / (N / r);
+			int ir, ii;
+			ir = index(o, s * (k + n * N / r), 0, N / r);
+			ii = index(o, s * (k + n * N / r), 1, N / r);
+			int tmpi = i % NPAR;
+			if (k * n == 0) {
+			} else if (k * n == N / 8 && N % 8 == 0) {
+				print("tmp%i = x[%i];\n", tmpi, ir);
+				print("x[%i] = M_SQRT1_2 * (x[%i] + x[%i]);\n", ir, ir, ii);
+				print("x[%i] = -M_SQRT1_2 * (tmp%i - x[%i]);\n", ii, tmpi, ii);
+			} else if (k * n == 3 * N / 8 && N % 8 == 0) {
+				print("tmp%i = x[%i];\n", tmpi, ir);
+				print("x[%i] = -M_SQRT1_2 * (x[%i] - x[%i]);\n", ir, ir, ii);
+				print("x[%i] = -M_SQRT1_2 * (tmp%i + x[%i]);\n", ii, tmpi, ii);
+			} else if (k * n == 7 * N / 8 && N % 8 == 0) {
+				print("tmp%i = x[%i];\n", tmpi, ir);
+				print("x[%i] = M_SQRT1_2 * (x[%i] - x[%i]);\n", ir, ir, ii);
+				print("x[%i] = M_SQRT1_2 * (tmp%i + x[%i]);\n", ii, tmpi, ii);
+			} else if (k * n == 5 * N / 8 && N % 8 == 0) {
+				print("tmp%i = x[%i];\n", tmpi, ir);
+				print("x[%i] = -M_SQRT1_2 * (x[%i] + x[%i]);\n", ir, ir, ii);
+				print("x[%i] = M_SQRT1_2 * (tmp%i - x[%i]);\n", ii, tmpi, ii);
+			} else if (k * n == N / 4 && N % 4 == 0) {
+				print("std::swap(x[%i], x[%i]);\n", ir, ii);
+				print("x[%i] = -x[%i];\n", ii, ii);
+			} else if (k * n == 3 * N / 4 && N % 4 == 0) {
+				print("std::swap(x[%i], x[%i]);\n", ir, ii);
+				print("x[%i] = -x[%i];\n", ir, ir);
+			} else if (k * n == N / 2 && N % 2 == 0) {
+				print("x[%i] = -x[%i];\n", ir, ir);
+				print("x[%i] = -x[%i];\n", ii, ii);
 			} else {
-				bool found = false;
-				for (int r = 2; r <= rader_radix; r++) {
-					if (is_prime(r) && N % r == 0) {
-						fftt.N1 = r;
-						found = true;
-						break;
-					}
-				}
-				if (!found) {
-					fftt.type = RADERS;
-					fftt.N1 = N;
-				}
+				const auto W = twiddle(k * n, N);
+				print("tmp%i = x[%i];\n", tmpi, ir);
+				print("x[%i] = std::fma(x[%i], (%.17e), x[%i] * (%.17e));\n", ir, ir, W.real(), ii, -W.imag());
+				print("x[%i] = std::fma(x[%i], (%.17e), tmp%i * (%.17e));\n", ii, ii, W.real(), tmpi, W.imag());
 			}
 		}
+	}
+
+	if (N / r != 1) {
+		print("for (int k = 0; k < %i; k++) {\n", N / r);
+		indent();
+		print("auto* y = x + %i * k + %i;\n", s * 2, 2 * o);
+	} else {
+		print("{\n");
+		indent();
+		print("auto* y = x + %i;\n", 2 * o);
+	}
+	std::vector<std::string> out;
+	std::vector<std::string> in;
+	for (int i = 0; i < r; i++) {
+		out.push_back(std::string("y[" + std::to_string((s * 2 * i * N / r)) + "]"));
+		out.push_back(std::string("y[" + std::to_string((s * 2 * i * N / r) + 1) + "]"));
+	}
+	in = out;
+	print_complex_short_fft(r, in, out);
+	deindent();
+	print("}\n");
+	deindent();
+	print("}\n");
+}
+
+
+
+fft_type best_radix(int N, int o, bool first) {
+
+	fft_type fftt;
+
+	auto facs = fft_factorization(N);
+	int radix = facs[0].first;
+	fftt.nops = 0;
+	if( radix > RADER_LEN) {
+		fftt.type = RADERS;
+		fftt.N1 = radix;
+	} else {
+		fftt.type = RADIX;
+		fftt.N1 = radix;
 	}
 	return fftt;
 }

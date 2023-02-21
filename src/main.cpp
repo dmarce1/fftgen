@@ -20,6 +20,7 @@ int fft_nops[MAXFFT + 1];
 void print_fft(int N) {
 	std::string fname = "fft." + std::to_string(N) + ".cpp";
 	set_file(fname);
+	print("// Complex FFT with factorization %s.\n", fft_factorization_string(N).c_str());
 	print("#include \"fft.hpp\"\n");
 	print("\nvoid fft_base_%i(double* x) {\n", N);
 	indent();
@@ -49,6 +50,7 @@ void print_fft(int N) {
 void print_fft_real(int N) {
 	std::string fname = "fft.real." + std::to_string(N) + ".cpp";
 	set_file(fname);
+	print("// Real FFT with factorization %s.\n", fft_factorization_string(N).c_str());
 	print("#include \"fft.hpp\"\n");
 	print("\nvoid fft_real_base_%i(double* x) {\n", N);
 	indent();
@@ -292,7 +294,7 @@ int main(int argc, char **argv) {
 
 	set_file("Makefile");
 	print("CC=g++\n");
-//	print("CFLAGS=-I. -g -O0 -D_GLIBCXX_DEBUG -march=native\n");
+	//	print("CFLAGS=-I. -g -O0 -fsanitize=address -D_GLIBCXX_DEBUG -march=native\n");
 	print("CFLAGS=-I. -Ofast -march=native\n");
 	print("DEPS = fft.hpp\n");
 	print("OBJ = fft.o ");

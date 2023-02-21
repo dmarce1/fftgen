@@ -334,7 +334,7 @@ void fft_radix_real(int N1, int N2) {
 	int ipar = 0;
 	if (N >= LOOP_N) {
 		if (N2 > 1) {
-			print("static twiddle_set<%i> twiddles;\n", N);
+			print("static twiddle_set twiddles(%i);\n", N);
 			print("for( int n1 = 1; n1 < %i; n1++ ) {\n", N1);
 			indent();
 			print("const int n1N2 = n1 * %i;\n", N2);

@@ -2,6 +2,8 @@
 #include <cassert>
 #include <fftw3.h>
 #include <unordered_map>
+#include <vector>
+#include <algorithm>
 
 std::complex<double> twiddle(int k, int N) {
 	return std::polar(1.0, -2.0 * M_PI * ((k + N) % N) / N);
@@ -15,7 +17,39 @@ std::string to_str(std::complex<double> z) {
 	return rc;
 }
 
-std::unordered_map<int, int> prime_fac(int N) {
+int greatest_fft_factor(int N) {
+	int gprime = greatest_prime_factor(N);
+	if (gprime > 15) {
+		return gprime;
+	} else {
+		for (int i = 15; i >= 2; i--) {
+			if (N % i == 0) {
+				return i;
+			}
+		}
+	}
+
+}
+
+std::vector<std::pair<int, int>> fft_factorization(int N) {
+	std::unordered_map<int, int> facs;
+	while (N != 1) {
+		int pf = greatest_fft_factor(N);
+		if (facs.find(pf) == facs.end()) {
+			facs[pf] = 0;
+		}
+		facs[pf]++;
+		N /= pf;
+	}
+	std::vector<std::pair<int, int>> rc(facs.begin(), facs.end());
+	std::sort(rc.begin(), rc.end(), [](std::pair<int, int> a, std::pair<int, int> b ) {
+		return a.first < b.first;
+	});
+	return rc;
+}
+
+
+std::vector<std::pair<int, int>> prime_factorization(int N) {
 	std::unordered_map<int, int> facs;
 	while (N != 1) {
 		int pf = greatest_prime_factor(N);
@@ -25,7 +59,25 @@ std::unordered_map<int, int> prime_fac(int N) {
 		facs[pf]++;
 		N /= pf;
 	}
-	return facs;
+	std::vector<std::pair<int, int>> rc(facs.begin(), facs.end());
+	std::sort(rc.begin(), rc.end(), [](std::pair<int, int> a, std::pair<int, int> b ) {
+		return a.first < b.first;
+	});
+	return rc;
+}
+
+std::string fft_factorization_string(int N) {
+	const auto facs = fft_factorization(N);
+	std::string str;
+	for (int n = 0; n < facs.size(); n++) {
+		str += std::to_string(facs[n].first);
+		str += "^";
+		str += std::to_string(facs[n].second);
+		if (n != facs.size() - 1) {
+			str += " * ";
+		}
+	}
+	return str;
 }
 
 int square_factor(int N) {
@@ -146,13 +198,13 @@ int generator(long long N) {
 			assert(n >= 0);
 			assert(n < N);
 			if (!I[n]) {
-				if( N == 839 && g == 11 ) {
-					printf( "%i %i\n", m, n);
+				if (N == 839 && g == 11) {
+					printf("%i %i\n", m, n);
 				}
 				I[n] = true;
 			} else {
-				if( N == 839 && g == 11 ) {
-					printf( "%i %i * \n", m, n);
+				if (N == 839 && g == 11) {
+					printf("%i %i * \n", m, n);
 				}
 				fail = true;
 				break;
