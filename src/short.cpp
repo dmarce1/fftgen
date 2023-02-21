@@ -28,10 +28,10 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 		if (N > 2) {
 			for (int n = 1; n <= (N - 1) / 2; n++) {
 				vars.push_back(std::string("ap") + std::to_string(n));
-				vars.push_back(std::string("am") + std::to_string(n));
+				vars.push_back(std::string("bm") + std::to_string(n));
 				if (!real) {
 					vars.push_back(std::string("bp") + std::to_string(n));
-					vars.push_back(std::string("bm") + std::to_string(n));
+					vars.push_back(std::string("am") + std::to_string(n));
 				}
 			}
 		}
@@ -70,41 +70,50 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 			}
 			print_notab(";\n");
 		}
-		for (int j = 1; j <= (N - 1) / 2; j++) {
-			print("const auto tp%i = %s + %s;\n", j, in[2 * j], in[2 * (N - j)]);
-		}
-		for (int j = 1; j <= (N - 1) / 2; j++) {
-			print("const auto tm%i = %s - %s;\n", j, in[2 * j], in[2 * (N - j)]);
-		}
 		if (!real) {
 			for (int j = 1; j <= (N - 1) / 2; j++) {
-				print("const auto up%i = %s + %s;\n", j, in[2 * j + 1], in[2 * (N - j) + 1]);
+				print("const auto tp%i = %s + %s;\n", j, in[ri[j]], in[ri[N - j]]);
 			}
 			for (int j = 1; j <= (N - 1) / 2; j++) {
-				print("const auto um%i = %s - %s;\n", j, in[2 * j + 1], in[2 * (N - j) + 1]);
+				print("const auto tm%i = %s - %s;\n", j, in[ri[j]], in[ri[N - j]]);
+			}
+			for (int j = 1; j <= (N - 1) / 2; j++) {
+				print("const auto up%i = %s + %s;\n", j, in[ii[j]], in[ii[N - j]]);
+			}
+			for (int j = 1; j <= (N - 1) / 2; j++) {
+				print("const auto um%i = %s - %s;\n", j, in[ii[j]], in[ii[N - j]]);
+			}
+		} else {
+			for (int j = 1; j <= (N - 1) / 2; j++) {
+				print("const auto tp%i = %s + %s;\n", j, in[ri[j]], in[ii[N - j]]);
+			}
+			for (int j = 1; j <= (N - 1) / 2; j++) {
+				print("const auto tm%i = %s - %s;\n", j, in[ri[j]], in[ii[N - j]]);
 			}
 		}
 		for (int i = 1; i <= (N - 1) / 2; i++) {
-			print("ap%i = %s;\n", i, in[0]);
-			print("bp%i = %s;\n", i, in[1]);
+			print("ap%i = %s;\n", i, in[ri[0]]);
+			if (!real) {
+				print("bp%i = %s;\n", i, in[ii[0]]);
+			}
 			for (int j = 1; j <= (N - 1) / 2; j++) {
 				int k = (j * i) % N;
 				if (k == 0) {
 					print("ap%i += tp%i;\n", i, j);
-					print("bp%i += up%i;\n", i, j);
+					real ? void() : print("bp%i += up%i;\n", i, j);
 				} else if (k == N / 2 && N % 2 == 0) {
 					print("ap%i -= tp%i;\n", i, j);
-					print("bp%i -= up%i;\n", i, j);
+					real ? void() : print("bp%i -= up%i;\n", i, j);
 				} else if (k == N / 4 && N % 4 == 0) {
 				} else if (k == 3 * N / 4 && N % 4 == 0) {
 				} else {
 					print("ap%i = std::fma(tp%i, (%24.17e), ap%i);\n", i, j, cos(2.0 * M_PI * j * i / N), i);
-					print("bp%i = std::fma(up%i, (%24.17e), bp%i);\n", i, j, cos(2.0 * M_PI * j * i / N), i);
+					real ? void() : print("bp%i = std::fma(up%i, (%24.17e), bp%i);\n", i, j, cos(2.0 * M_PI * j * i / N), i);
 				}
 			}
 			if (N % 2 == 0) {
-				print("ap%i %c= %s;\n", i, i % 2 == 0 ? '+' : '-', in[N]);
-				print("bp%i %c= %s;\n", i, i % 2 == 0 ? '+' : '-', in[N + 1]);
+				print("ap%i %c= %s;\n", i, i % 2 == 0 ? '+' : '-', in[ri[N / 2]]);
+				real ? void() : print("bp%i %c= %s;\n", i, i % 2 == 0 ? '+' : '-', in[ii[N / 2]]);
 			}
 		}
 		for (int i = 1; i <= (N - 1) / 2; i++) {
@@ -113,7 +122,7 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 			for (int j = 1; j <= (N - 1) / 2; j++) {
 				int k = (j * i) % N;
 				if (k == N / 4 && N % 4 == 0) {
-					print("am%i = um%i;\n", i, j);
+					real ? void() : print("am%i = um%i;\n", i, j);
 					print("bm%i = tm%i;\n", i, j);
 					init = true;
 					init_ele[j] = true;
@@ -127,13 +136,13 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 					} else if (k == N / 2 && N % 2 == 0) {
 					} else if (k == N / 4 && N % 4 == 0) {
 					} else if (k == 3 * N / 4 && N % 4 == 0) {
-						print("am%i = -um%i;\n", i, j);
+						real ? void() : print("am%i = -um%i;\n", i, j);
 						print("bm%i = -tm%i;\n", i, j);
 						init = true;
 						init_ele[j] = true;
 						break;
 					} else {
-						print("am%i = um%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N));
+						real ? void() : print("am%i = um%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N));
 						print("bm%i = tm%i * (%24.17e);\n", i, j, sin(2.0 * M_PI * j * i / N));
 						init = true;
 						init_ele[j] = true;
@@ -147,13 +156,13 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 					if (k == 0) {
 					} else if (k == N / 2 && N % 2 == 0) {
 					} else if (k == N / 4 && N % 4 == 0) {
-						print("am%i += um%i;\n", i, j);
+						real ? void() : print("am%i += um%i;\n", i, j);
 						print("bm%i += tm%i;\n", i, j);
 					} else if (k == 3 * N / 4 && N % 4 == 0) {
-						print("am%i -= um%i;\n", i, j);
+						real ? void() : print("am%i -= um%i;\n", i, j);
 						print("bm%i -= tm%i;\n", i, j);
 					} else {
-						print("am%i = std::fma(um%i, (%24.17e), am%i);\n", i, j, sin(2.0 * M_PI * j * i / N), i);
+						real ? void() : print("am%i = std::fma(um%i, (%24.17e), am%i);\n", i, j, sin(2.0 * M_PI * j * i / N), i);
 						print("bm%i = std::fma(tm%i, (%24.17e), bm%i);\n", i, j, sin(2.0 * M_PI * j * i / N), i);
 					}
 				}
@@ -161,71 +170,95 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 		}
 		if (N % 2 == 0) {
 			if (N % 4 == 0) {
-				print("pr0 = sr0 = %s + %s;\n", in[0], in[N]);
-				print("pi0 = si0 = %s + %s;\n", in[1], in[N + 1]);
+				print("pr0 = sr0 = %s + %s;\n", in[ri[0]], in[ri[N / 2]]);
+				if (!real) {
+					print("pi0 = si0 = %s + %s;\n", in[ii[0]], in[ii[N / 2]]);
+				}
 			} else {
-				print("sr0 = %s + %s;\n", in[0], in[N]);
-				print("si0 = %s + %s;\n", in[1], in[N + 1]);
-				print("pr0 = %s - %s;\n", in[0], in[N]);
-				print("pi0 = %s - %s;\n", in[1], in[N + 1]);
+				print("sr0 = %s + %s;\n", in[ri[0]], in[ri[N / 2]]);
+				print("pr0 = %s - %s;\n", in[ri[0]], in[ri[N / 2]]);
+				if (!real) {
+					print("si0 = %s + %s;\n", in[ii[0]], in[ii[N / 2]]);
+					print("pi0 = %s - %s;\n", in[ii[0]], in[ii[N / 2]]);
+				}
 			}
 		} else {
-			print("sr0 = %s;\n", in[0]);
-			print("si0 = %s;\n", in[1]);
+			print("sr0 = %s;\n", in[ri[0]]);
+			if (!real) {
+				print("si0 = %s;\n", in[ii[0]]);
+			}
 		}
 		if (N % 2 == 0 && N > 4) {
 			print("er0 = tp2;\n");
-			print("ei0 = up2;\n");
 			print("or0 = tp1;\n");
-			print("oi0 = up1;\n");
-			for (int i = 4; i <= (N - 1) / 2; i += 2) {
-				print("er0 += tp%i;\n", i);
+			if (!real) {
+				print("ei0 = up2;\n");
+				print("oi0 = up1;\n");
 			}
 			for (int i = 4; i <= (N - 1) / 2; i += 2) {
-				print("ei0 += up%i;\n", i);
+				print("er0 += tp%i;\n", i);
 			}
 			for (int i = 3; i <= (N - 1) / 2; i += 2) {
 				print("or0 += tp%i;\n", i);
 			}
-			for (int i = 3; i <= (N - 1) / 2; i += 2) {
-				print("oi0 += up%i;\n", i);
-			}
 			print("sr0 += er0 + or0;\n");
-			print("si0 += ei0 + oi0;\n");
 			print("pr0 += er0 - or0;\n");
-			print("pi0 += ei0 - oi0;\n");
+			if (!real) {
+				for (int i = 4; i <= (N - 1) / 2; i += 2) {
+					print("ei0 += up%i;\n", i);
+				}
+				for (int i = 3; i <= (N - 1) / 2; i += 2) {
+					print("oi0 += up%i;\n", i);
+				}
+				print("si0 += ei0 + oi0;\n");
+				print("pi0 += ei0 - oi0;\n");
+			}
 		} else {
 			for (int i = 1; i <= (N - 1) / 2; i++) {
 				print("sr0 += tp%i;\n", i);
 			}
-			for (int i = 1; i <= (N - 1) / 2; i++) {
-				print("si0 += up%i;\n", i);
+			if (!real) {
+				for (int i = 1; i <= (N - 1) / 2; i++) {
+					print("si0 += up%i;\n", i);
+				}
 			}
 			if (N % 2 == 0) {
 				for (int i = 1; i <= (N - 1) / 2; i++) {
 					print("pr0 %c= tp%i;\n", i % 2 == 0 ? '+' : '-', i);
 				}
-				for (int i = 1; i <= (N - 1) / 2; i++) {
-					print("pi0 %c= up%i;\n", i % 2 == 0 ? '+' : '-', i);
+				if (!real) {
+					for (int i = 1; i <= (N - 1) / 2; i++) {
+						print("pi0 %c= up%i;\n", i % 2 == 0 ? '+' : '-', i);
+					}
 				}
 			}
 		}
-		print("%s = sr0;\n", out[0]);
-		print("%s = si0;\n", out[1]);
-		if (N % 2 == 0) {
-			print("%s = pr0;\n", out[N]);
-			print("%s = pi0;\n", out[N + 1]);
+		if (!real) {
+			print("%s = sr0;\n", out[ri[0]]);
+			print("%s = si0;\n", out[ii[0]]);
+			if (N % 2 == 0) {
+				print("%s = pr0;\n", out[ri[N / 2]]);
+				print("%s = pi0;\n", out[ii[N / 2]]);
+			}
+			for (int i = 1; i <= (N - 1) / 2; i++) {
+				print("%s = ap%i + am%i;\n", out[ri[i]], i, i);
+				print("%s = bp%i - bm%i;\n", out[ii[i]], i, i);
+				print("%s = ap%i - am%i;\n", out[ri[N - i]], i, i);
+				print("%s = bp%i + bm%i;\n", out[ii[N - i]], i, i);
+			}
+		} else {
+			print("%s = sr0;\n", out[ri[0]]);
+			if (N % 2 == 0) {
+				print("%s = pr0;\n", out[ri[N / 2]]);
+			}
+			for (int i = 1; i <= (N - 1) / 2; i++) {
+				print("%s = ap%i;\n", out[ri[i]], i, i);
+				print("%s = -bm%i;\n", out[ii[i]], i, i);
+			}
 		}
-		for (int i = 1; i <= (N - 1) / 2; i++) {
-			print("%s = ap%i + am%i;\n", out[2 * i], i, i);
-			print("%s = bp%i - bm%i;\n", out[2 * i + 1], i, i);
-			print("%s = ap%i - am%i;\n", out[2 * (N - i)], i, i);
-			print("%s = bp%i + bm%i;\n", out[2 * (N - i) + 1], i, i);
-		}
-
 	} else if (real) {
-		int N1 = pow(pfac[0].first, pfac[0].second);
-		int N2 = N / N1;
+		int N2 = pow(pfac[0].first, pfac[0].second);
+		int N1 = N / N2;
 		std::vector<std::vector<std::string>> in1(N2, std::vector<std::string>(N1));
 		std::vector<std::vector<std::string>> out1(N2, std::vector<std::string>(N1));
 		std::vector<std::vector<std::string>> out2(N1 / 2 + 1, std::vector<std::string>(2 * N2));
@@ -236,6 +269,16 @@ void print_short_fft(int N, std::vector<std::string> in_, std::vector<std::strin
 				in1[n2][n1] = in[nn];
 			}
 		}
+		print("double zr0, ");
+		for (int n = 1; n < N - 1; n++) {
+			print_notab("zr%i, ", n);
+		}
+		print_notab("zr%i;\n", N - 1);
+		print("double ");
+		for (int n = 1; n < N - 2; n++) {
+			print_notab("zi%i, ", n);
+		}
+		print_notab("zi%i;\n", N - 2);
 		for (int n2 = 0; n2 < N2; n2++) {
 			out1[n2][0] = std::string("zr") + std::to_string(n2 * N1);
 			for (int n1 = 1; n1 < N1 / 2 + 1; n1++) {
@@ -724,7 +767,7 @@ void print_skew_short_fft(int N1, std::vector<std::string> in_, std::vector<std:
 		in[i] = in_[i].c_str();
 		out[i] = out_[i].c_str();
 	}
-	if (N1 % 2 == 0 && N1 > 6) {
+	if (N1 % 2 == 0 && N1 > 4) {
 		std::vector<std::string> in1(N1 / 2);
 		std::vector<std::string> in2(N1 / 2);
 		std::vector<std::string> out1(N1 / 2);
@@ -793,7 +836,7 @@ void print_skew_short_fft(int N1, std::vector<std::string> in_, std::vector<std:
 		print("/* end short transform - shifted conjugate symmetric - length %i */\n", N1);
 		return;
 	}
-	if (N1 % 2 == 1) {
+	if (N1 % 2 == 1 && N1 > 4) {
 		for (int n = 0; n < N1; n += 2) {
 			print("const auto a%i = %s;\n", n / 2, in[n]);
 			in1[n / 2] = std::string("a") + std::to_string(n / 2);
@@ -889,6 +932,8 @@ void print_skew_short_fft(int N1, std::vector<std::string> in_, std::vector<std:
 		print("%s = t5 + t1;\n", out[2]);
 		print("%s = t6 + t2;\n", out[3]);
 		break;
+	default:
+		abort();
 
 	}
 	print("/* end short transform - shifted conjugate symmetric - length %i */\n", N1);
