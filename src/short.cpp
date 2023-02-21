@@ -73,7 +73,7 @@ int print_short_fft(int N, std::vector<std::string> in_, std::vector<std::string
 			}
 		}
 		print("/* begin short transform - %s - length %i */\n", real ? "real" : "complex", N);
-		if (pfac[0].second > 1 && !(real && N % 2 == 0)) {
+		if (pfac[0].second > 1 /*&& !(real && N % 2 == 0)*/) {
 			if (!real && N % 4 == 0 && N >= 4) {
 				std::vector<std::string> in0;
 				std::vector<std::string> in1;
@@ -227,100 +227,225 @@ int print_short_fft(int N, std::vector<std::string> in_, std::vector<std::string
 					print("}\n");
 				}
 			} else {
-				std::vector<std::string> vars;
-				int R = pfac[0].first;
-				std::vector<std::vector<std::string>> in1(R);
-				std::vector<std::vector<std::string>> out1(R);
-				for (int n = 0; n < N; n++) {
-					vars.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(n));
-				}
-				for (int n = 0; n < N; n++) {
-					vars.push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(n));
-				}
-				print_vars(vars);
-				for (int n = 0; n < N / R; n++) {
-					for (int r = 0; r < R; r++) {
-						in1[r].push_back(in[R * n + r]);
-						if (n < N / R / 2 + 1) {
-							out1[r].push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * n + r));
-						} else {
-							out1[r].push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(R * (N / R - n) + r));
+				if (N % 4 == 0) {
+					std::vector<std::string> vars;
+					int R = 4;
+					std::vector<std::vector<std::string>> in1(R);
+					std::vector<std::vector<std::string>> out1(R);
+					for (int n = 0; n < N; n++) {
+						vars.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(n));
+					}
+					for (int n = 0; n < N; n++) {
+						vars.push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(n));
+					}
+					print_vars(vars);
+					for (int n = 0; n < N / R; n++) {
+						for (int r = 0; r < R; r++) {
+							in1[r].push_back(in[R * n + r]);
+							if (n < N / R / 2 + 1) {
+								out1[r].push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * n + r));
+							} else {
+								out1[r].push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(R * (N / R - n) + r));
+							}
 						}
 					}
-				}
-				if (N > R) {
-					for (int r = 0; r < R; r++) {
+					if (N > R) {
+						for (int r = 0; r < R; r++) {
+							print("{\n");
+							indent();
+							ocnt += print_real_short_fft(N / R, in1[r], out1[r]);
+							deindent();
+							print("}\n");
+						}
+					}
+					for (int k = 1; k < R; k++) {
+						for (int n = 1; n <= ((N / R) - 1) / 2; n++) {
+							const auto tw = std::polar(1.0, -2.0 * M_PI * n * k / N);
+							int q = R * n + k;
+							if (n * k == 0) {
+
+							} else if (n * k == N / 2 && N % 2 == 0) {
+								print("y%ir%i = -y%ir%i;\n", N, q, N, q);
+								print("y%ii%i = -y%ii%i;\n", N, q, N, q);
+								ocnt += 2;
+							} else if (n * k == N / 4 && N % 4 == 0) {
+								print("std::swap(y%ir%i, y%ii%i);\n", N, q, N, q);
+								print("y%ii%i = -y%ii%i;\n", N, q, N, q);
+								ocnt++;
+							} else if (n * k == 3 * N / 4 && N % 4 == 0) {
+								print("std::swap(y%ir%i, y%ii%i);\n", N, q, N, q);
+								print("y%ir%i = -y%ir%i;\n", N, q, N, q);
+								ocnt++;
+							} else {
+								print("tmp0 = y%ir%i;\n", N, q);
+								print("y%ir%i = std::fma(y%ir%i, %.17e, y%ii%i * %.17e);\n", N, q, N, q, tw.real(), N, q, -tw.imag());
+								print("y%ii%i = std::fma(tmp0, %.17e, y%ii%i * %.17e);\n", N, q, tw.imag(), N, q, tw.real());
+								ocnt += (6 - 2 * use_fma);
+							}
+						}
+					}
+					{
+						int k = 0;
 						print("{\n");
 						indent();
-						ocnt += print_real_short_fft(N / R, in1[r], out1[r]);
+						std::vector<std::string> in2, out2;
+						for (int r = 0; r < R; r++) {
+							in2.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * k + r));
+							out2.push_back(out[(N / R * r + k)]);
+						}
+						ocnt += print_real_short_fft(R, in2, out2);
 						deindent();
 						print("}\n");
 					}
-				}
-				for (int k = 1; k < R; k++) {
-					for (int n = 1; n <= ((N / R) - 1) / 2; n++) {
-						const auto tw = std::polar(1.0, -2.0 * M_PI * n * k / N);
-						int q = R * n + k;
-						if (n * k == 0) {
+					std::vector<std::string> negs;
+					for (int k = 1; k <= ((N / R) - 1) / 2; k++) {
+						print("{\n");
+						indent();
+						std::vector<std::string> in2, out2;
+						for (int r = 0; r < R; r++) {
+							in2.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * k + r));
+							in2.push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(R * k + r));
+							int iii = (N / R * r + k);
+							if (iii < N / 2 + 1) {
+								out2.push_back(out[iii]);
+								out2.push_back(out[N - iii]);
+							} else {
+								out2.push_back(out[N - iii]);
+								out2.push_back(out[iii]);
+								negs.push_back(out[iii]);
+							}
 
-						} else if (n * k == N / 2 && N % 2 == 0) {
-							print("y%ir%i = -y%ir%i;\n", N, q, N, q);
-							print("y%ii%i = -y%ii%i;\n", N, q, N, q);
-							ocnt += 2;
-						} else if (n * k == N / 4 && N % 4 == 0) {
-							print("std::swap(y%ir%i, y%ii%i);\n", N, q, N, q);
-							print("y%ii%i = -y%ii%i;\n", N, q, N, q);
-							ocnt++;
-						} else if (n * k == 3 * N / 4 && N % 4 == 0) {
-							print("std::swap(y%ir%i, y%ii%i);\n", N, q, N, q);
-							print("y%ir%i = -y%ir%i;\n", N, q, N, q);
-							ocnt++;
-						} else {
-							print("tmp0 = y%ir%i;\n", N, q);
-							print("y%ir%i = std::fma(y%ir%i, %.17e, y%ii%i * %.17e);\n", N, q, N, q, tw.real(), N, q, -tw.imag());
-							print("y%ii%i = std::fma(tmp0, %.17e, y%ii%i * %.17e);\n", N, q, tw.imag(), N, q, tw.real());
-							ocnt += (6 - 2 * use_fma);
+						}
+						ocnt += print_short_fft(R, in2, out2);
+						deindent();
+						print("}\n");
+					}
+					if ((N / R) % 2 == 0) {
+						int k = N / R / 2;
+						print("{\n");
+						indent();
+						std::vector<std::string> in2, out2;
+						for (int r = 0; r < R; r++) {
+							in2.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * k + r));
+							out2.push_back(out[(N / R * r + k)]);
+						}
+						ocnt += print_skew_short_fft(R, in2, out2);
+						deindent();
+						print("}\n");
+					}
+					for (int i = 0; i < negs.size(); i++) {
+						print("%s = -%s;\n", negs[i].c_str(), negs[i].c_str());
+					}
+				} else {
+					std::vector<std::string> vars;
+					int R = pfac[0].first;
+					std::vector<std::vector<std::string>> in1(R);
+					std::vector<std::vector<std::string>> out1(R);
+					for (int n = 0; n < N; n++) {
+						vars.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(n));
+					}
+					for (int n = 0; n < N; n++) {
+						vars.push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(n));
+					}
+					print_vars(vars);
+					for (int n = 0; n < N / R; n++) {
+						for (int r = 0; r < R; r++) {
+							in1[r].push_back(in[R * n + r]);
+							if (n < N / R / 2 + 1) {
+								out1[r].push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * n + r));
+							} else {
+								out1[r].push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(R * (N / R - n) + r));
+							}
 						}
 					}
-				}
-				{
-					int k = 0;
-					print("{\n");
-					indent();
-					std::vector<std::string> in2, out2;
-					for (int r = 0; r < R; r++) {
-						in2.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * k + r));
-						out2.push_back(out[(N / R * r + k)]);
-					}
-					ocnt += print_real_short_fft(R, in2, out2);
-					deindent();
-					print("}\n");
-				}
-				std::vector<std::string> negs;
-				for (int k = 1; k <= ((N / R) - 1) / 2; k++) {
-					print("{\n");
-					indent();
-					std::vector<std::string> in2, out2;
-					for (int r = 0; r < R; r++) {
-						in2.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * k + r));
-						in2.push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(R * k + r));
-						int iii = (N / R * r + k);
-						if (iii < N / 2 + 1) {
-							out2.push_back(out[iii]);
-							out2.push_back(out[N - iii]);
-						} else {
-							out2.push_back(out[N - iii]);
-							out2.push_back(out[iii]);
-							negs.push_back(out[iii]);
+					if (N > R) {
+						for (int r = 0; r < R; r++) {
+							print("{\n");
+							indent();
+							ocnt += print_real_short_fft(N / R, in1[r], out1[r]);
+							deindent();
+							print("}\n");
 						}
-
 					}
-					ocnt += print_short_fft(R, in2, out2);
-					deindent();
-					print("}\n");
-				}
-				for (int i = 0; i < negs.size(); i++) {
-					print("%s = -%s;\n", negs[i].c_str(), negs[i].c_str());
+					for (int k = 1; k < R; k++) {
+						for (int n = 1; n <= ((N / R) - 1) / 2; n++) {
+							const auto tw = std::polar(1.0, -2.0 * M_PI * n * k / N);
+							int q = R * n + k;
+							if (n * k == 0) {
+
+							} else if (n * k == N / 2 && N % 2 == 0) {
+								print("y%ir%i = -y%ir%i;\n", N, q, N, q);
+								print("y%ii%i = -y%ii%i;\n", N, q, N, q);
+								ocnt += 2;
+							} else if (n * k == N / 4 && N % 4 == 0) {
+								print("std::swap(y%ir%i, y%ii%i);\n", N, q, N, q);
+								print("y%ii%i = -y%ii%i;\n", N, q, N, q);
+								ocnt++;
+							} else if (n * k == 3 * N / 4 && N % 4 == 0) {
+								print("std::swap(y%ir%i, y%ii%i);\n", N, q, N, q);
+								print("y%ir%i = -y%ir%i;\n", N, q, N, q);
+								ocnt++;
+							} else {
+								print("tmp0 = y%ir%i;\n", N, q);
+								print("y%ir%i = std::fma(y%ir%i, %.17e, y%ii%i * %.17e);\n", N, q, N, q, tw.real(), N, q, -tw.imag());
+								print("y%ii%i = std::fma(tmp0, %.17e, y%ii%i * %.17e);\n", N, q, tw.imag(), N, q, tw.real());
+								ocnt += (6 - 2 * use_fma);
+							}
+						}
+					}
+					{
+						int k = 0;
+						print("{\n");
+						indent();
+						std::vector<std::string> in2, out2;
+						for (int r = 0; r < R; r++) {
+							in2.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * k + r));
+							out2.push_back(out[(N / R * r + k)]);
+						}
+						ocnt += print_real_short_fft(R, in2, out2);
+						deindent();
+						print("}\n");
+					}
+					std::vector<std::string> negs;
+					for (int k = 1; k <= ((N / R) - 1) / 2; k++) {
+						print("{\n");
+						indent();
+						std::vector<std::string> in2, out2;
+						for (int r = 0; r < R; r++) {
+							in2.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * k + r));
+							in2.push_back(std::string("y") + std::to_string(N) + "i" + std::to_string(R * k + r));
+							int iii = (N / R * r + k);
+							if (iii < N / 2 + 1) {
+								out2.push_back(out[iii]);
+								out2.push_back(out[N - iii]);
+							} else {
+								out2.push_back(out[N - iii]);
+								out2.push_back(out[iii]);
+								negs.push_back(out[iii]);
+							}
+
+						}
+						ocnt += print_short_fft(R, in2, out2);
+						deindent();
+						print("}\n");
+					}
+					if ((N / R) % 2 == 0) {
+						int k = N / R / 2;
+						print("{\n");
+						indent();
+						std::vector<std::string> in2, out2;
+						for (int r = 0; r < R; r++) {
+							in2.push_back(std::string("y") + std::to_string(N) + "r" + std::to_string(R * k + r));
+							out2.push_back(out[(N / R * r + k)]);
+						}
+						ocnt += print_skew_short_fft(R, in2, out2);
+						deindent();
+						print("}\n");
+					}
+					for (int i = 0; i < negs.size(); i++) {
+						print("%s = -%s;\n", negs[i].c_str(), negs[i].c_str());
+					}
+
 				}
 			}
 		} else {
