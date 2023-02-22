@@ -20,10 +20,10 @@
 #define COOLEY 3
 #define MWEIGHT (1.5)
 constexpr int NPAR = 4;
-#define MAXFFT 128
+#define MAXFFT 16
 #define DFFT 1
 #define LOOP_N 100
-#define SMALL_MAX 15
+#define SMALL_MAX 16
 #define RADER_LEN 28
 
 struct fft_type {

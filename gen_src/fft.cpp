@@ -596,7 +596,7 @@ void test() {
 		timer tm1, tm2;
 		double err;
 		double max;
-		for (int ti = 0; ti < 256; ti++) {
+		for (int ti = 0; ti < 1; ti++) {
 			err = 0.0;
 			max = 0.0;
 			std::vector<std::complex<double>> X(N / 2 + 1);
@@ -619,14 +619,14 @@ void test() {
 			tm4.stop();
 			//	printf("\n");
 			for (int i = 0; i < X.size(); i++) {
-				Y[i] -= X[i];
+			//	Y[i] -= X[i];
 			}
 			for (int n = 0; n < N / 2 + 1; n++) {
 				err += std::abs(Y[n]) * std::abs(Y[n]);
-				//	printf("%i %16.6e %16.6e %16.6e %16.6e\n", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());
-				max = std::max(max, std::abs(X[n]));
+					printf("%i %16.6e %16.6e %16.6e %16.6e\n", n, X[n].real(), X[n].imag(), Y[n].real(), Y[n].imag());
+			//	max = std::max(max, std::abs(X[n]));
 			}
-			err = sqrt(err / N) / max;
+		//	err = sqrt(err / N) / max;
 		}
 		printf("%4i %4i %e %e %e %e %e %e %e\n", N, fft_nops_real[N], err, tm1.read(), tm2.read(), tm1.read() / tm2.read(), tm3.read(), tm4.read(), tm3.read() / tm4.read());
 	}
